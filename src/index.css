@@ -4,104 +4,84 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Lumina Design System — Soft amber & cream, warmth & wisdom */
+/* Gentle Guide Design System — Calm, Trustworthy, Research-Grade */
 
 @layer base {
   :root {
-    /* Warm cream background */
-    --background: 40 50% 98%;
-    --foreground: 25 35% 22%;
+    /* Base: Warm, sophisticated paper tone */
+    --background: 40 20% 98%; /* #FDFCF8 */
+    --foreground: 0 0% 20%;   /* Soft Charcoal */
 
-    /* Card surfaces */
-    --card: 40 45% 96%;
-    --card-foreground: 25 35% 22%;
+    /* Card: Subtle differentiation */
+    --card: 40 20% 96%;
+    --card-foreground: 0 0% 20%;
 
     /* Popover */
-    --popover: 40 50% 98%;
-    --popover-foreground: 25 35% 22%;
+    --popover: 40 20% 98%;
+    --popover-foreground: 0 0% 20%;
 
-    /* Primary: Soft amber */
-    --primary: 35 60% 88%;
-    --primary-foreground: 25 40% 20%;
+    /* Primary: Deep Calm Teal (Trustworthy, Mentor-like) */
+    --primary: 195 25% 35%; /* #436470 */
+    --primary-foreground: 40 20% 98%;
 
-    /* Secondary: Warm cream */
-    --secondary: 38 35% 92%;
-    --secondary-foreground: 25 35% 25%;
+    /* Secondary: Sandstone (Grounding) */
+    --secondary: 35 15% 90%;
+    --secondary-foreground: 195 25% 35%;
 
-    /* Muted tones */
-    --muted: 35 25% 90%;
-    --muted-foreground: 25 20% 45%;
+    /* Muted: Mist */
+    --muted: 210 10% 92%;
+    --muted-foreground: 210 5% 50%;
 
-    /* Accent: Subtle gold */
-    --accent: 38 55% 82%;
-    --accent-foreground: 25 40% 18%;
+    /* Accent: Hopeful Sage */
+    --accent: 150 15% 45%; 
+    --accent-foreground: 40 20% 98%;
 
     /* Destructive */
-    --destructive: 0 60% 50%;
+    --destructive: 0 40% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders & inputs */
-    --border: 35 30% 85%;
-    --input: 35 30% 88%;
-    --ring: 35 50% 70%;
+    /* Borders: Soft pencil lines */
+    --border: 210 10% 90%;
+    --input: 210 10% 90%;
+    --ring: 195 25% 35%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    /* Sidebar (if needed) */
-    --sidebar-background: 40 45% 96%;
-    --sidebar-foreground: 25 35% 25%;
-    --sidebar-primary: 35 60% 88%;
-    --sidebar-primary-foreground: 25 40% 20%;
-    --sidebar-accent: 38 55% 85%;
-    --sidebar-accent-foreground: 25 40% 18%;
-    --sidebar-border: 35 30% 85%;
-    --sidebar-ring: 35 50% 70%;
-
-    /* Custom Lumina tokens */
-    --lumina-amber: 35 60% 88%;
-    --lumina-cream: 40 50% 98%;
-    --lumina-brown: 25 35% 22%;
-    --lumina-gold: 38 65% 55%;
-    --lumina-glow: 35 70% 92%;
+    /* Custom Tokens */
+    --gentle-paper: 40 20% 98%;
+    --gentle-text: 0 0% 20%;
+    --gentle-teal: 195 25% 35%;
   }
 
+  /* Dark mode: Deep Archive / Library at Night */
   .dark {
-    --background: 25 25% 8%;
-    --foreground: 35 30% 90%;
+    --background: 210 15% 10%; /* Deep Slate */
+    --foreground: 40 10% 90%;
 
-    --card: 25 25% 10%;
-    --card-foreground: 35 30% 90%;
+    --card: 210 15% 12%;
+    --card-foreground: 40 10% 90%;
 
-    --popover: 25 25% 10%;
-    --popover-foreground: 35 30% 90%;
+    --popover: 210 15% 10%;
+    --popover-foreground: 40 10% 90%;
 
-    --primary: 35 50% 75%;
-    --primary-foreground: 25 30% 10%;
+    --primary: 195 20% 60%; /* Softer Teal for dark mode */
+    --primary-foreground: 210 15% 10%;
 
-    --secondary: 25 20% 15%;
-    --secondary-foreground: 35 30% 85%;
+    --secondary: 210 15% 15%;
+    --secondary-foreground: 40 10% 90%;
 
-    --muted: 25 20% 18%;
-    --muted-foreground: 35 20% 55%;
+    --muted: 210 15% 20%;
+    --muted-foreground: 210 10% 60%;
 
-    --accent: 35 45% 25%;
-    --accent-foreground: 35 30% 90%;
+    --accent: 150 15% 45%;
+    --accent-foreground: 210 15% 10%;
 
-    --destructive: 0 55% 45%;
+    --destructive: 0 50% 40%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 25 20% 20%;
-    --input: 25 20% 18%;
-    --ring: 35 40% 50%;
-
-    --sidebar-background: 25 25% 10%;
-    --sidebar-foreground: 35 30% 85%;
-    --sidebar-primary: 35 50% 75%;
-    --sidebar-primary-foreground: 25 30% 10%;
-    --sidebar-accent: 35 40% 20%;
-    --sidebar-accent-foreground: 35 30% 85%;
-    --sidebar-border: 25 20% 20%;
-    --sidebar-ring: 35 40% 50%;
+    --border: 210 15% 20%;
+    --input: 210 15% 20%;
+    --ring: 195 20% 60%;
   }
 }
 
@@ -113,100 +93,41 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
+    font-weight: 300; /* Lighter weight for elegance */
+    letter-spacing: 0.01em;
+  }
+
+  /* Serif for mentor voice & headings */
+  h1, h2, h3, h4, h5, h6, .font-serif {
+    font-family: 'Cormorant Garamond', serif;
     font-weight: 400;
   }
 
-  /* Elegant serif for mentor's voice */
-  .font-serif {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-  }
-
-  /* Generous line-height for breathing room */
-  p, .prose {
+  p {
     line-height: 1.8;
-  }
-
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
   }
 }
 
 @layer utilities {
-  /* Breathing glow animation */
-  @keyframes breathe {
-    0%, 100% {
-      opacity: 0.4;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.7;
-      transform: scale(1.02);
-    }
-  }
-
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
-  }
-
-  @keyframes fade-in-up {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes typing {
-    from {
-      opacity: 0.3;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
   .animate-breathe {
-    animation: breathe 4s ease-in-out infinite;
+    animation: breathe 6s ease-in-out infinite;
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 1s ease-out forwards;
   }
 
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
+  @keyframes breathe {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
   }
 
-  .animate-fade-in-up {
-    animation: fade-in-up 0.8s ease-out forwards;
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  .animate-typing {
-    animation: typing 0.5s ease-in-out infinite alternate;
-  }
-
-  /* Buttery-smooth transitions */
-  .transition-gentle {
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* Soft shadows */
-  .shadow-gentle {
-    box-shadow: 0 4px 20px -4px hsl(35 50% 50% / 0.15);
-  }
-
-  .shadow-warm {
-    box-shadow: 0 8px 40px -8px hsl(35 60% 50% / 0.2);
-  }
-
-  /* Text selection */
-  ::selection {
-    background: hsl(35 60% 88%);
-    color: hsl(25 35% 22%);
+  .text-balance {
+    text-wrap: balance;
   }
 }
