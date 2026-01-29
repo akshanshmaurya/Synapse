@@ -22,3 +22,43 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables - CRITICAL: Never commit these!
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+backend/.env
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+eggs/
+*.egg-info/
+*.egg
+
+# IDE specific
+.idea/
+*.iml
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Secrets and credentials
+*.pem
+*.key
+secrets/
+credentials/
