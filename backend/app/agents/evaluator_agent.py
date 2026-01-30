@@ -53,7 +53,7 @@ CORE PHILOSOPHY:
 - Be a strict judge of learning quality.
 
 OUTPUT AS JSON:
-{
+{{
     "clarity_score": 0-100,
     "confusion_trend": "improving" or "stable" or "worsening",
     "understanding_delta": -10 to +10,
@@ -67,7 +67,7 @@ OUTPUT AS JSON:
     "new_interest_detected": null or "new interest mentioned",
     "stage_change_recommended": null or "new stage suggestion",
     "pace_adjustment": null or "slow_down" or "speed_up" or "maintain"
-}
+}}
 
 BE HONEST. Do not inflate clarity_score.
 RESPOND ONLY WITH VALID JSON."""
