@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Sprout, Home, MessageSquare, Map, User, Settings, Shield, Edit3, X, Plus, Check, LogOut, Loader2 } from "lucide-react";
+import { Leaf, Sprout, Home, MessageSquare, Map, User, Shield, Edit3, X, Plus, Check, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchUserMemory, updateUserProfile } from "@/services/api";
 

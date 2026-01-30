@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Leaf, Sprout, Home, MessageSquare, Map, User, Settings, ChevronRight, Compass, HelpCircle, AlertCircle, RefreshCw, Check, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Leaf, Sprout, Home, MessageSquare, Map, User, LogOut, ChevronRight, Compass, HelpCircle, AlertCircle, RefreshCw, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface RoadmapStep {
@@ -27,7 +27,8 @@ interface Roadmap {
 }
 
 export default function RoadmapPage() {
-    const { token, isAuthenticated } = useAuth();
+    const { token, isAuthenticated, logout } = useAuth();
+    const navigate = useNavigate();
     const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -190,9 +191,12 @@ export default function RoadmapPage() {
                         ))}
                     </nav>
 
-                    <button className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[#8B8178] hover:bg-[#E8DED4]/50 transition-all duration-500">
-                        <Settings className="w-5 h-5" />
-                        <span className="text-sm font-medium">Settings</span>
+                    <button
+                        onClick={() => { logout(); navigate("/"); }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all duration-500"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Sign Out</span>
                     </button>
                 </aside>
 

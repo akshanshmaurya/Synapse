@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, Settings, Sprout, LogOut } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, Sprout, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio } from "@/services/api";
@@ -129,30 +129,13 @@ export default function MentorPage() {
                         ))}
                     </nav>
 
-                    {/* Bottom */}
-                    <div className="space-y-2">
-                        <button className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-[#8B8178] hover:bg-[#E8DED4]/50 transition-all duration-500">
-                            <Settings className="w-5 h-5" />
-                            <span className="text-sm font-medium">Settings</span>
-                        </button>
-                        {isAuthenticated ? (
-                            <button
-                                onClick={handleLogout}
-                                className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all duration-500"
-                            >
-                                <LogOut className="w-5 h-5" />
-                                <span className="text-sm font-medium">Sign out</span>
-                            </button>
-                        ) : (
-                            <Link
-                                to="/signin"
-                                className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-[#5C6B4A] bg-[#5C6B4A]/10 hover:bg-[#5C6B4A]/20 transition-all duration-500"
-                            >
-                                <User className="w-5 h-5" />
-                                <span className="text-sm font-medium">Sign in</span>
-                            </Link>
-                        )}
-                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all duration-500"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Sign Out</span>
+                    </button>
                 </aside>
 
                 {/* Main Content */}
