@@ -219,16 +219,26 @@ Write a warm, person-focused summary (not a list). Start with their stage of gro
             current_streak = 1
         
         # Update effort metrics
-        await memory_collection.update_one(
-            {"user_id": user_id},
-            {
-                "$inc": {"progress.effort_metrics.total_sessions": 1 if session_occurred else 0},
-                "$set": {
-                    "progress.effort_metrics.consistency_streak": current_streak,
-                    "progress.effort_metrics.last_session_date": now,
-                    "updated_at": now
+        update_ops = {
+            "$inc": {"progress.effort_metrics.total_sessions": 1 if session_occurred else 0},
+            "$set": {
+                "progress.effort_metrics.consistency_streak": current_streak,
+                "progress.effort_metrics.last_session_date": now,
+                "updated_at": now
+            }
+        }
+        
+        if session_occurred:
+            update_ops["$push"] = {
+                "progress.session_dates": {
+                    "$each": [now],
+                    "$slice": -100  # Keep last 100 sessions
                 }
             }
+        
+        await memory_collection.update_one(
+            {"user_id": user_id},
+            update_ops
         )
     
     async def update_learner_traits(self, user_id: str):

@@ -57,11 +57,13 @@ from app.routes.auth import router as auth_router
 from app.routes.roadmap import router as roadmap_router
 from app.routes.onboarding import router as onboarding_router
 from app.routes.chat_history import router as chat_history_router
+from app.routes.trace import router as trace_router
 
 app.include_router(auth_router)
 app.include_router(roadmap_router)
 app.include_router(onboarding_router)
 app.include_router(chat_history_router)
+app.include_router(trace_router)
 
 # Orchestrator instance
 orchestrator = AgentOrchestrator()

@@ -15,6 +15,7 @@ from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.evaluator_agent import EvaluatorAgent
 from app.services.chat_service import chat_service
+from app.services.trace_service import trace_service
 from app.models.chat import MessageSender
 
 
@@ -33,19 +34,15 @@ class AgentOrchestrator:
     ) -> Dict[str, Any]:
         """
         Async version of message processing.
-        
-        CRITICAL ORDER:
-        1. Save user message (synchronous)
-        2. Get context and generate response
-        3. Save mentor response (synchronous)
-        4. Return to user immediately
-        5. Evaluator/memory runs async (non-blocking)
         """
+        request_id = uuid.uuid4().hex[:8]
+        
         # Get or create chat session
         if not chat_id:
             chat_id = await chat_service.get_or_create_active_chat(user_id)
         
         try:
+            # ========== STEP 1: SAVE USER MESSAGE IMMEDIATELY ==========
             # ========== STEP 1: SAVE USER MESSAGE IMMEDIATELY ==========
             await chat_service.add_message(
                 chat_id=chat_id,
@@ -53,12 +50,22 @@ class AgentOrchestrator:
                 sender=MessageSender.USER,
                 content=message
             )
+            # [TRACE] User Message
+            await trace_service.add_trace(request_id, "Persistence", "User Message Saved", {
+                "chat_id": chat_id, 
+                "length": len(message)
+            })
             
             # ========== STEP 2: GET CONTEXT (OPTIMIZED) ==========
-            # Only fetch compressed memory summary + last 5 messages
             user_context = await self.memory_agent.get_user_context(user_id)
             recent_context = await chat_service.format_context_for_llm(chat_id, n=5)
             user_context["recent_chat"] = recent_context
+            
+            # [TRACE] Context Fetch
+            await trace_service.add_trace(request_id, "Memory", "Context Fetched", {
+                "profile": "Loaded",
+                "chat_history": len(recent_context.split('\n')) if recent_context else 0
+            })
             
             # Check message count to determine if this is first message
             msg_count = await chat_service.get_message_count(chat_id)
@@ -67,8 +74,22 @@ class AgentOrchestrator:
             # ========== STEP 3: PLANNER (includes chat_intent) ==========
             strategy = self.planner_agent.plan_response(user_context, message)
             
+            # [TRACE] Planner
+            await trace_service.add_trace(request_id, "Planner", "Strategy Implemented", {
+                "strategy": strategy.get("strategy"),
+                "tone": strategy.get("tone"),
+                "intent": strategy.get("chat_intent"),
+                "verbosity": strategy.get("verbosity")
+            })
+            
             # ========== STEP 4: EXECUTOR (generates response + title) ==========
             response = self.executor_agent.generate_response(user_context, message, strategy)
+            
+            # [TRACE] Executor
+            await trace_service.add_trace(request_id, "Executor", "Response Generated", {
+                "line_count": len(response.split('\n')),
+                "style": "point-to-point" if strategy.get("verbosity") == "brief" else "standard"
+            })
             
             # ========== STEP 5: SAVE MENTOR RESPONSE IMMEDIATELY ==========
             await chat_service.add_message(
@@ -78,6 +99,11 @@ class AgentOrchestrator:
                 content=response,
                 metadata={"planner_strategy": strategy}
             )
+            # [TRACE] Persistence
+            await trace_service.add_trace(request_id, "Persistence", "Mentor Response Saved", {
+                "chat_id": chat_id,
+                "sync": True
+            })
             
             # ========== STEP 6: UPDATE CHAT TITLE (first message only) ==========
             if is_first_message:
@@ -98,7 +124,8 @@ class AgentOrchestrator:
                 message=message,
                 response=response,
                 user_context=user_context,
-                strategy=strategy
+                strategy=strategy,
+                request_id=request_id
             ))
             
             return result
@@ -118,11 +145,11 @@ class AgentOrchestrator:
         message: str,
         response: str,
         user_context: Dict,
-        strategy: Dict
+        strategy: Dict,
+        request_id: str
     ):
         """
         Run evaluator and memory updates asynchronously.
-        These NEVER block the user from getting their response.
         """
         try:
             # Struggle detection
@@ -133,6 +160,7 @@ class AgentOrchestrator:
                     struggle_check["topic"],
                     struggle_check.get("severity", "mild")
                 )
+                await trace_service.add_trace(request_id, "Evaluator", "Struggle Detected", struggle_check)
             
             # Memory updates from planner
             memory_update = strategy.get("memory_update", {})
@@ -141,15 +169,24 @@ class AgentOrchestrator:
                 if memory_update["new_interest"] not in interests:
                     interests.append(memory_update["new_interest"])
                     await self.memory_agent.update_profile(user_id, interests=interests)
+                    await trace_service.add_trace(request_id, "Memory", "Profile Updated", {"new_interest": memory_update["new_interest"]})
             
             if memory_update.get("new_goal"):
                 goals = user_context.get("profile", {}).get("goals", [])
                 if memory_update["new_goal"] not in goals:
                     goals.append(memory_update["new_goal"])
                     await self.memory_agent.update_profile(user_id, goals=goals)
+                    await trace_service.add_trace(request_id, "Memory", "Profile Updated", {"new_goal": memory_update["new_goal"]})
             
             # Evaluate the interaction
             evaluation = self.evaluator_agent.evaluate_interaction(message, response, user_context)
+            
+            # [TRACE] Evaluator
+            await trace_service.add_trace(request_id, "Evaluator", "Interaction Scored", {
+                "clarity_score": evaluation.get("clarity_score"),
+                "delta": evaluation.get("understanding_delta"),
+                "trend": evaluation.get("confusion_trend")
+            })
             
             # Update memory based on evaluation (insights only)
             await self.evaluator_agent.update_memory_from_evaluation(user_id, evaluation)
@@ -159,6 +196,10 @@ class AgentOrchestrator:
             
             # Update effort metrics
             await self.memory_agent.update_effort_metrics(user_id, session_occurred=True)
+            await trace_service.add_trace(request_id, "Memory", "Effort Metrics Saved", {
+                "session": "Recorded",
+                "timestamp": "ISO8601"
+            })
             
             # Periodically update learner traits
             if user_context.get("progress", {}).get("total_interactions", 0) % 5 == 0:

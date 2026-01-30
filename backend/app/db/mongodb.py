@@ -34,6 +34,10 @@ class MongoDB:
             cls.connect()
         return cls.db
 
+def get_database():
+    return MongoDB.get_db()
+
+
 # Collections
 def get_users_collection():
     return MongoDB.get_db()["users"]
