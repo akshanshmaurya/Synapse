@@ -16,6 +16,7 @@ src/
 ├── components/
 │   ├── Logo.tsx             # Brand wordmark component
 │   ├── ProtectedRoute.tsx   # Auth guard component
+│   ├── CognitiveTracePanel.tsx # Live system activity
 │   └── ui/                  # shadcn/ui components
 ├── contexts/
 │   └── AuthContext.tsx      # Authentication state management
@@ -169,6 +170,7 @@ interface DashboardData {
 | Mentor responses | ✅ |
 | Auth-protected | ✅ |
 | TTS audio playback | ✅ |
+| System Activity Panel | ✅ | Live trace visualization |
 | Logo component | ✅ |
 
 **API Connected:** `POST /api/chat`, `POST /api/tts`  
@@ -269,6 +271,7 @@ All API calls go through `src/services/api.ts`:
 | `generateRoadmap` | `/api/roadmap/generate` | POST |
 | `submitRoadmapFeedback` | `/api/roadmap/feedback` | POST |
 | `regenerateRoadmap` | `/api/roadmap/regenerate` | POST |
+| `fetchTraces` | `/api/traces` | GET |
 
 ---
 
