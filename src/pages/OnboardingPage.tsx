@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Sprout, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import { Sprout, ChevronRight, ChevronLeft, Sparkles, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Logo from "@/components/Logo";
+
 
 interface OnboardingQuestion {
     id: string;
@@ -15,7 +16,7 @@ interface OnboardingQuestion {
 }
 
 export default function OnboardingPage() {
-    const { token, isAuthenticated } = useAuth();
+    const { token, isAuthenticated, logout } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -77,34 +78,36 @@ export default function OnboardingPage() {
     ];
 
     useEffect(() => {
-        // Only check once when token is available
-        if (token && !hasChecked) {
-            checkOnboardingStatus();
-        } else if (!token) {
-            setIsLoading(false);
-        }
-    }, [token, hasChecked]);
+        // Only check once after token loads
+        if (hasChecked) return;
 
-    const checkOnboardingStatus = async () => {
         if (!token) {
-            setIsLoading(false);
+            // Wait for auth to load
             return;
         }
-        try {
-            const response = await fetch(`${API_URL}/api/onboarding/status`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await response.json();
-            if (data.is_complete) {
-                navigate("/dashboard");
+
+        // Mark as checked immediately to prevent reruns
+        setHasChecked(true);
+
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/onboarding/status`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await response.json();
+                if (data.is_complete) {
+                    navigate("/dashboard", { replace: true });
+                    return;
+                }
+            } catch (error) {
+                console.error("Failed to check onboarding status:", error);
+            } finally {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.error("Failed to check onboarding status:", error);
-        } finally {
-            setHasChecked(true);
-            setIsLoading(false);
-        }
-    };
+        };
+
+        checkStatus();
+    }, [token, hasChecked, navigate]);
 
     const handleAnswer = (value: string) => {
         const currentQuestion = questions[step];
@@ -133,6 +136,7 @@ export default function OnboardingPage() {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
+            console.log("[DEBUG] Submitting onboarding with token:", token ? "present" : "missing");
             const response = await fetch(`${API_URL}/api/onboarding/complete`, {
                 method: "POST",
                 headers: {
@@ -142,11 +146,19 @@ export default function OnboardingPage() {
                 body: JSON.stringify(answers),
             });
 
+            console.log("[DEBUG] Onboarding response status:", response.status);
+
             if (response.ok) {
-                navigate("/dashboard");
+                console.log("[DEBUG] Onboarding complete, navigating to dashboard");
+                navigate("/dashboard", { replace: true });
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                console.error("[DEBUG] Onboarding failed:", errorData);
+                alert("Onboarding failed. Please try again.");
             }
         } catch (error) {
             console.error("Failed to submit onboarding:", error);
+            alert("Network error. Please check your connection.");
         } finally {
             setIsSubmitting(false);
         }
@@ -180,7 +192,19 @@ export default function OnboardingPage() {
                 className="w-full max-w-xl relative z-10"
             >
                 {/* Header */}
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 relative">
+                    {/* Logout Button */}
+                    <button
+                        onClick={() => {
+                            logout();
+                            navigate("/");
+                        }}
+                        className="absolute top-0 right-0 flex items-center gap-2 px-3 py-2 text-sm text-[#8B8178] hover:text-[#5C6B4A] hover:bg-[#E8DED4]/50 rounded-full transition-all duration-300"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        <span>Exit</span>
+                    </button>
+
                     <div className="inline-flex items-center gap-3 mb-4">
                         <Logo size="lg" linkToHome={false} />
                     </div>

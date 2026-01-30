@@ -33,8 +33,10 @@ async def get_user_chats(
     Get paginated list of user's chat sessions.
     Ordered by most recently updated.
     """
+    user_id = str(user["_id"])  # Convert ObjectId to string
+    
     sessions = await chat_service.get_user_chats(
-        user_id=user["_id"],
+        user_id=user_id,
         limit=limit,
         offset=offset
     )
@@ -52,8 +54,10 @@ async def create_chat_session(
     user: dict = Depends(get_current_user)
 ):
     """Create a new chat session."""
+    user_id = str(user["_id"])  # Convert ObjectId to string
+    
     chat_id = await chat_service.create_chat_session(
-        user_id=user["_id"],
+        user_id=user_id,
         title=request.title or "New Conversation"
     )
     
@@ -121,9 +125,11 @@ async def delete_chat_session(
     user: dict = Depends(get_current_user)
 ):
     """Delete a chat session and all its messages."""
+    user_id = str(user["_id"])  # Convert ObjectId to string
+    
     success = await chat_service.delete_chat_session(
         chat_id=chat_id,
-        user_id=user["_id"]
+        user_id=user_id
     )
     
     if not success:
