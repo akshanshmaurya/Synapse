@@ -86,6 +86,47 @@ export const fetchUserMemory = async (): Promise<any> => {
     }
 };
 
+// Dashboard Data Types
+export interface DashboardData {
+    momentum: {
+        state: "starting" | "building" | "steady" | "accelerating";
+        insight: string;
+        metrics: {
+            sessions_this_week: number;
+            roadmap_progress: number;
+            clarity_trend: "low" | "moderate" | "high";
+        };
+    };
+    next_bloom: {
+        title: string;
+        description: string;
+        source: "roadmap" | "inferred";
+        action_hint?: string;
+    } | null;
+    recent_signals: {
+        observation: string;
+        timestamp: string;
+        type: "pattern" | "progress" | "struggle";
+        severity?: "mild" | "moderate" | "significant";
+    }[];
+    show_daily_nurture: boolean;
+    daily_nurture_prompt: string | null;
+}
+
+
+export const fetchDashboardData = async (): Promise<DashboardData | null> => {
+    try {
+        const response = await fetch(`${API_URL}/api/user/dashboard`, {
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Fetch Dashboard Error:', error);
+        return null;
+    }
+};
+
 export const updateUserProfile = async (interests?: string[], goals?: string[]): Promise<boolean> => {
     try {
         const params = new URLSearchParams();

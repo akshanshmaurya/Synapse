@@ -38,6 +38,10 @@ class UserProfile(BaseModel):
     communication_style: Optional[str] = None
     learning_preferences: Optional[List[str]] = None
     learning_pace: str = "moderate"  # slow, moderate, fast
+    # Inferred traits (derived over time)
+    abstraction_level: str = "moderate"  # concrete, moderate, abstract
+    autonomy: str = "guided"  # guided, semi-autonomous, self-directed
+    confidence_trend: str = "stable"  # declining, stable, growing
 
 class UserProgress(BaseModel):
     """User progress tracking"""
@@ -47,6 +51,12 @@ class UserProgress(BaseModel):
     current_roadmap_id: Optional[str] = None
     last_session: Optional[datetime] = None
     roadmap_regeneration_count: int = 0  # Track how many times roadmap was regenerated
+    # Session tracking for consistency calculation
+    session_dates: List[datetime] = []
+    # Clarity/confusion tracking
+    confusion_count: int = 0
+    clarity_reached_count: int = 0
+    time_to_clarity_avg: float = 0.0  # Average messages until confusion resolves
 
 class UserMemory(BaseModel):
     """Complete user memory document"""
