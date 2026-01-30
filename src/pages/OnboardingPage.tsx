@@ -16,7 +16,7 @@ interface OnboardingQuestion {
 }
 
 export default function OnboardingPage() {
-    const { token, isAuthenticated, logout } = useAuth();
+    const { token, isAuthenticated, logout, checkOnboarding } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -136,7 +136,6 @@ export default function OnboardingPage() {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            console.log("[DEBUG] Submitting onboarding with token:", token ? "present" : "missing");
             const response = await fetch(`${API_URL}/api/onboarding/complete`, {
                 method: "POST",
                 headers: {
@@ -146,14 +145,14 @@ export default function OnboardingPage() {
                 body: JSON.stringify(answers),
             });
 
-            console.log("[DEBUG] Onboarding response status:", response.status);
-
             if (response.ok) {
-                console.log("[DEBUG] Onboarding complete, navigating to dashboard");
+                // Update AuthContext state BEFORE navigating
+                await checkOnboarding();
+                // Now navigate - ProtectedRoute will see onboardingComplete=true
                 navigate("/dashboard", { replace: true });
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("[DEBUG] Onboarding failed:", errorData);
+                console.error("Onboarding failed:", errorData);
                 alert("Onboarding failed. Please try again.");
             }
         } catch (error) {
