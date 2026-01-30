@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Sprout, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import Logo from "@/components/Logo";
 
 export default function SignUpPage() {
     const [name, setName] = useState("");
@@ -57,9 +58,7 @@ export default function SignUpPage() {
             >
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <Link to="/" className="inline-flex items-center gap-3">
-                        <img src="/logo.png" alt="Synapse" className="h-12" />
-                    </Link>
+                    <Logo size="lg" />
                 </div>
 
                 {/* Card */}

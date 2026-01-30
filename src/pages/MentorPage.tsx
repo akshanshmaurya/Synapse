@@ -4,6 +4,7 @@ import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, Sprout, LogOut } f
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio } from "@/services/api";
+import Logo from "@/components/Logo";
 
 interface Reflection {
     id: string;
@@ -109,7 +110,7 @@ export default function MentorPage() {
                 <aside className="w-64 p-6 flex flex-col fixed h-screen">
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-12">
-                        <img src="/logo.png" alt="Synapse" className="h-10" />
+                        <Logo size="md" />
                     </div>
 
                     {/* Nav */}

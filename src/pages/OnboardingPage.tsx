@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Sprout, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import Logo from "@/components/Logo";
 
 interface OnboardingQuestion {
     id: string;
@@ -175,7 +176,7 @@ export default function OnboardingPage() {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-4">
-                        <img src="/logo.png" alt="Synapse" className="h-12" />
+                        <Logo size="lg" linkToHome={false} />
                     </div>
                     <p className="text-[#8B8178]">Let me learn a little about you</p>
                 </div>
