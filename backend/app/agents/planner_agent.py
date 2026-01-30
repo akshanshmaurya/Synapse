@@ -62,6 +62,7 @@ OUTPUT A JSON OBJECT with this structure:
     "detected_emotion": "neutral, frustrated, excited, confused, or discouraged",
     "roadmap_relevant": true or false,
     "pacing": "slow, normal, or accelerated",
+    "chat_intent": "short 3-5 word description of what this conversation is about, e.g. 'career roadmap discussion' or 'learning python basics'",
     "memory_update": {{
         "new_interest": null or "string",
         "new_goal": null or "string",
@@ -163,6 +164,8 @@ RESPOND ONLY WITH VALID JSON."""
             "should_ask_question": True,
             "detected_emotion": "neutral",
             "roadmap_relevant": False,
+            "pacing": "normal",
+            "chat_intent": "new conversation",
             "memory_update": {
                 "new_interest": None,
                 "new_goal": None,

@@ -4,24 +4,19 @@ Password Hashing Utilities
 Design:
 - Supports passwords of arbitrary length
 - Avoids bcrypt's 72-byte input limit via SHA-256 pre-hashing
-- Uses passlib for safe salt handling and verification
+- Uses bcrypt directly for hashing (avoids passlib backend issues)
 - Ensures bcrypt NEVER sees raw user input
 
 Hash scheme:
 bcrypt( base64( SHA256( UTF-8(password) ) ) )
 """
 
-from passlib.context import CryptContext
 import hashlib
 import base64
+import bcrypt
 
-# CryptContext allows future algorithm upgrades without breaking hashes
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-)
 
-def _prepare_password(password: str) -> str:
+def _prepare_password(password: str) -> bytes:
     """
     Normalize and pre-hash password.
 
@@ -30,7 +25,7 @@ def _prepare_password(password: str) -> str:
     2. SHA-256 hash (fixed 32 bytes)
     3. Base64 encode (ASCII-safe, ~44 chars)
 
-    Output is ALWAYS safe for bcrypt input.
+    Output is ALWAYS safe for bcrypt input (under 72 bytes).
     """
     if not isinstance(password, str):
         raise TypeError("Password must be a string")
@@ -39,7 +34,9 @@ def _prepare_password(password: str) -> str:
         password.encode("utf-8", errors="strict")
     ).digest()
 
-    return base64.b64encode(sha256_digest).decode("ascii")
+    # Base64 encode -> 44 characters, well under 72 byte limit
+    return base64.b64encode(sha256_digest)
+
 
 def hash_password(password: str) -> str:
     """
@@ -48,7 +45,10 @@ def hash_password(password: str) -> str:
     Accepts passwords of any length.
     """
     prepared = _prepare_password(password)
-    return pwd_context.hash(prepared)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(prepared, salt)
+    return hashed.decode("utf-8")
+
 
 def verify_password(plain_password: str, stored_hash: str) -> bool:
     """
@@ -57,4 +57,9 @@ def verify_password(plain_password: str, stored_hash: str) -> bool:
     Uses the same pre-hashing pipeline as hash_password().
     """
     prepared = _prepare_password(plain_password)
-    return pwd_context.verify(prepared, stored_hash)
+    stored_hash_bytes = stored_hash.encode("utf-8")
+    
+    try:
+        return bcrypt.checkpw(prepared, stored_hash_bytes)
+    except Exception:
+        return False

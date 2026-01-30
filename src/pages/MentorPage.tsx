@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, Sprout, LogOut } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, LogOut, History, Plus, X, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendMessage, streamAudio } from "@/services/api";
+import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
 import Logo from "@/components/Logo";
 
 interface Reflection {
@@ -29,6 +29,12 @@ export default function MentorPage() {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
 
+    // Chat history state
+    const [chatId, setChatId] = useState<string | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -39,6 +45,63 @@ export default function MentorPage() {
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [reflections, isReflecting]);
+
+    // Load chat sessions when history panel opens
+    useEffect(() => {
+        if (showHistory) {
+            loadChatSessions();
+        }
+    }, [showHistory]);
+
+    const loadChatSessions = async () => {
+        setLoadingHistory(true);
+        const sessions = await fetchChatSessions(20, 0);
+        setChatSessions(sessions);
+        setLoadingHistory(false);
+    };
+
+    const handleSelectSession = async (session: ChatSession) => {
+        setChatId(session._id);
+        setShowHistory(false);
+
+        // Load messages from this session
+        const messages = await fetchChatMessages(session._id);
+        const loadedReflections: Reflection[] = messages.map((msg: ChatMessage) => ({
+            id: msg._id,
+            type: msg.sender === "user" ? "thought" : "guidance",
+            content: msg.content,
+            timestamp: new Date(msg.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+        }));
+
+        if (loadedReflections.length > 0) {
+            setReflections(loadedReflections);
+        }
+    };
+
+    const handleNewChat = async () => {
+        const newChatId = await createChatSession();
+        if (newChatId) {
+            setChatId(newChatId);
+            setReflections([{
+                id: "welcome",
+                type: "guidance",
+                content: "A fresh beginning. What would you like to explore today?",
+                timestamp: "Just now"
+            }]);
+            setShowHistory(false);
+        }
+    };
+
+    const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+        e.stopPropagation();
+        const success = await deleteChatSession(sessionId);
+        if (success) {
+            setChatSessions(prev => prev.filter(s => s._id !== sessionId));
+            if (chatId === sessionId) {
+                setChatId(null);
+            }
+        }
+    };
 
     const handleSubmit = async () => {
         if (!input.trim()) return;
@@ -55,18 +118,23 @@ export default function MentorPage() {
         setIsReflecting(true);
 
         try {
-            const responseText = await sendMessage(thought.content);
+            const result = await sendMessage(thought.content, chatId || undefined);
+
+            // Track the chat_id from response
+            if (result.chatId && !chatId) {
+                setChatId(result.chatId);
+            }
 
             const guidance: Reflection = {
                 id: (Date.now() + 1).toString(),
                 type: "guidance",
-                content: responseText,
+                content: result.response,
                 timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
             };
             setReflections(prev => [...prev, guidance]);
 
             // Optional: play audio
-            const audio = await streamAudio(responseText);
+            const audio = await streamAudio(result.response);
             if (audio) {
                 audio.play().catch(e => console.log("Auto-play prevented:", e));
             }
@@ -148,18 +216,95 @@ export default function MentorPage() {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.6 }}
-                                className="flex items-center gap-3"
+                                className="flex items-center justify-between"
                             >
-                                <div className="w-12 h-12 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
-                                    <Leaf className="w-6 h-6 text-[#5C6B4A]" />
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
+                                        <Leaf className="w-6 h-6 text-[#5C6B4A]" />
+                                    </div>
+                                    <div>
+                                        <h1 className="font-serif text-2xl text-[#3D3D3D]">Nurturing Session</h1>
+                                        <p className="text-sm text-[#8B8178]">A space for reflection and growth</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h1 className="font-serif text-2xl text-[#3D3D3D]">Nurturing Session</h1>
-                                    <p className="text-sm text-[#8B8178]">A space for reflection and growth</p>
-                                </div>
+
+                                {/* History Button */}
+                                <button
+                                    onClick={() => setShowHistory(!showHistory)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-[#E8DED4] text-[#8B8178] hover:bg-[#5C6B4A] hover:text-white transition-all duration-300"
+                                >
+                                    <History className="w-4 h-4" />
+                                    <span className="text-sm font-medium">History</span>
+                                </button>
                             </motion.div>
                         </div>
                     </header>
+
+                    {/* History Panel */}
+                    <AnimatePresence>
+                        {showHistory && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="px-8"
+                            >
+                                <div className="max-w-3xl mx-auto bg-white/80 backdrop-blur-sm rounded-2xl border border-[#E8DED4] p-4 mb-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-serif text-lg text-[#3D3D3D]">Conversation History</h3>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleNewChat}
+                                                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#5C6B4A] text-white text-sm hover:bg-[#4A5A3A] transition-colors"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                New Chat
+                                            </button>
+                                            <button
+                                                onClick={() => setShowHistory(false)}
+                                                className="p-1.5 rounded-full hover:bg-[#E8DED4] transition-colors"
+                                            >
+                                                <X className="w-4 h-4 text-[#8B8178]" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {loadingHistory ? (
+                                        <p className="text-sm text-[#8B8178] text-center py-4">Loading...</p>
+                                    ) : chatSessions.length === 0 ? (
+                                        <p className="text-sm text-[#8B8178] text-center py-4">No previous conversations</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                            {chatSessions.map((session) => (
+                                                <div
+                                                    key={session._id}
+                                                    onClick={() => handleSelectSession(session)}
+                                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${chatId === session._id
+                                                            ? "bg-[#5C6B4A]/10 border border-[#5C6B4A]/30"
+                                                            : "hover:bg-[#E8DED4]/50"
+                                                        }`}
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-medium text-sm text-[#3D3D3D] truncate">{session.title}</p>
+                                                        <p className="text-xs text-[#8B8178] truncate">{session.last_message_preview || "No messages"}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 ml-2">
+                                                        <span className="text-xs text-[#8B8178]">{session.message_count} msgs</span>
+                                                        <button
+                                                            onClick={(e) => handleDeleteSession(e, session._id)}
+                                                            className="p-1 rounded hover:bg-red-100 text-[#8B8178] hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Reflections Area */}
                     <div className="flex-1 overflow-y-auto px-8 py-4">
@@ -276,3 +421,4 @@ export default function MentorPage() {
         </div>
     );
 }
+

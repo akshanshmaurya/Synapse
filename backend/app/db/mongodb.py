@@ -55,3 +55,25 @@ def get_roadmap_feedback_collection():
 
 def get_agent_logs_collection():
     return MongoDB.get_db()["agent_logs"]
+
+# NEW: Chat history collections (separate from memory)
+def get_chats_collection():
+    """Collection for chat sessions"""
+    return MongoDB.get_db()["chats"]
+
+def get_messages_collection():
+    """Collection for individual chat messages"""
+    return MongoDB.get_db()["messages"]
+
+async def create_chat_indexes():
+    """Create indexes for efficient chat queries"""
+    messages = get_messages_collection()
+    chats = get_chats_collection()
+    
+    # Compound index for fetching messages by chat, ordered by time
+    await messages.create_index([("chat_id", 1), ("timestamp", -1)])
+    # Index for user's messages
+    await messages.create_index("user_id")
+    # Index for user's chat sessions
+    await chats.create_index([("user_id", 1), ("updated_at", -1)])
+

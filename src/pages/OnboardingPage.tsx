@@ -19,6 +19,7 @@ export default function OnboardingPage() {
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasChecked, setHasChecked] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [answers, setAnswers] = useState<Record<string, string>>({
         why_here: "",
@@ -76,9 +77,13 @@ export default function OnboardingPage() {
     ];
 
     useEffect(() => {
-        // Auth check is now handled by ProtectedRoute wrapper
-        checkOnboardingStatus();
-    }, [token]);
+        // Only check once when token is available
+        if (token && !hasChecked) {
+            checkOnboardingStatus();
+        } else if (!token) {
+            setIsLoading(false);
+        }
+    }, [token, hasChecked]);
 
     const checkOnboardingStatus = async () => {
         if (!token) {
@@ -96,6 +101,7 @@ export default function OnboardingPage() {
         } catch (error) {
             console.error("Failed to check onboarding status:", error);
         } finally {
+            setHasChecked(true);
             setIsLoading(false);
         }
     };
