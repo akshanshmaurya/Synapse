@@ -25,7 +25,11 @@ class EvaluatorAgent:
         Analyze an interaction for insights.
         Returns evaluation results (not user-facing).
         """
-        prompt = f"""Analyze this mentor-student interaction for insights.
+        # Get previous evaluation for delta calculation
+        prev_evaluations = user_context.get('progress', {}).get('evaluation_history', [])
+        prev_clarity = prev_evaluations[-1].get('clarity_score', 50) if prev_evaluations else 50
+        
+        prompt = f"""Analyze this mentor-student interaction for learning quality insights.
 
 STUDENT MESSAGE: "{user_message}"
 MENTOR RESPONSE: "{mentor_response[:500]}"
@@ -35,20 +39,32 @@ STUDENT CONTEXT:
 - Learning pace: {user_context.get('profile', {}).get('learning_pace', 'moderate')}
 - Known struggles: {[s.get('topic') for s in user_context.get('struggles', [])[:3]]}
 - Onboarding style preference: {user_context.get('onboarding', {}).get('mentoring_style', 'supportive')}
+- Previous clarity score: {prev_clarity}
 
-Evaluate and OUTPUT AS JSON:
+IMPORTANT: Evaluate UNDERSTANDING QUALITY, not just activity or effort.
+- clarity_score: How well does the student understand the material? (0-100)
+- confusion_trend: Is confusion improving, stable, or worsening compared to recent history?
+- understanding_delta: Change in understanding from previous session (-10 to +10)
+- stagnation_flags: Topics where no progress is being made
+
+OUTPUT AS JSON:
 {{
-    "engagement_level": "high, medium, or low",
+    "clarity_score": 0-100,
+    "confusion_trend": "improving" or "stable" or "worsening",
+    "understanding_delta": -10 to +10,
+    "stagnation_flags": ["topic1", "topic2"] or [],
+    "engagement_level": "high" or "medium" or "low",
     "struggle_detected": null or "topic that needs attention",
-    "struggle_severity": "mild, moderate, or significant",
+    "struggle_severity": "mild" or "moderate" or "significant",
     "positive_signals": ["list of growth indicators"],
-    "response_effectiveness": "effective, neutral, or needs_adjustment",
+    "response_effectiveness": "effective" or "neutral" or "needs_adjustment",
     "suggested_next_focus": "what to focus on in future interactions",
     "new_interest_detected": null or "new interest mentioned",
     "stage_change_recommended": null or "new stage suggestion",
     "pace_adjustment": null or "slow_down" or "speed_up" or "maintain"
 }}
 
+BE HONEST. Do not inflate clarity_score if the student is confused.
 RESPOND ONLY WITH VALID JSON."""
 
         try:
@@ -272,6 +288,10 @@ RESPOND ONLY WITH JSON."""
     def _default_evaluation(self) -> Dict[str, Any]:
         """Return default evaluation when analysis fails"""
         return {
+            "clarity_score": 50,
+            "confusion_trend": "stable",
+            "understanding_delta": 0,
+            "stagnation_flags": [],
             "engagement_level": "medium",
             "struggle_detected": None,
             "struggle_severity": None,

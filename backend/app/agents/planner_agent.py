@@ -17,8 +17,25 @@ class PlannerAgent:
     def plan_response(self, user_context: Dict[str, Any], current_message: str) -> Dict[str, Any]:
         """
         Plan the response strategy based on user context.
+        Uses evaluator history to inform tone and pacing decisions.
         Returns a structured strategy object (not user-facing).
         """
+        # Access evaluation history for informed planning
+        eval_history = user_context.get("progress", {}).get("evaluation_history", [])
+        recent_clarity = eval_history[-1].get("clarity_score", 50) if eval_history else 50
+        confusion_trend = eval_history[-1].get("confusion_trend", "stable") if eval_history else "stable"
+        effort_metrics = user_context.get("progress", {}).get("effort_metrics", {})
+        
+        # Determine strategy hint based on understanding state
+        if recent_clarity < 40:
+            strategy_hint = "User is struggling (clarity < 40%). Use supportive tone, slower pace, revisit fundamentals."
+        elif recent_clarity >= 70:
+            strategy_hint = "User understands well (clarity >= 70%). Can challenge more, introduce advanced concepts."
+        elif confusion_trend == "worsening":
+            strategy_hint = "Understanding is declining. Slow down, check for gaps, don't push forward."
+        else:
+            strategy_hint = "Moderate understanding. Continue at current pace with regular check-ins."
+        
         prompt = f"""You are a planning agent for an AI mentor. Analyze this context and decide the guidance strategy.
 
 USER CONTEXT:
@@ -27,6 +44,12 @@ USER CONTEXT:
 - Progress: {user_context.get('progress', {})}
 - Context Summary: {user_context.get('context_summary', 'New user')}
 - Recent Interactions: {user_context.get('recent_interactions', [])}
+
+EVALUATOR INSIGHTS (CRITICAL - use these to inform your strategy):
+- Current clarity score: {recent_clarity}/100
+- Confusion trend: {confusion_trend}
+- Total sessions: {effort_metrics.get('total_sessions', 0)}
+- Strategy hint: {strategy_hint}
 
 CURRENT MESSAGE: "{current_message}"
 
@@ -38,6 +61,7 @@ OUTPUT A JSON OBJECT with this structure:
     "should_ask_question": true or false,
     "detected_emotion": "neutral, frustrated, excited, confused, or discouraged",
     "roadmap_relevant": true or false,
+    "pacing": "slow, normal, or accelerated",
     "memory_update": {{
         "new_interest": null or "string",
         "new_goal": null or "string",
@@ -45,6 +69,7 @@ OUTPUT A JSON OBJECT with this structure:
     }}
 }}
 
+IMPORTANT: Adjust your strategy based on the clarity score. Do not push forward if clarity is low.
 RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
 
         try:
