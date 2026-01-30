@@ -49,6 +49,7 @@ flowchart TB
         OB[Onboarding]
         DASH[Dashboard]
         MENTOR[Mentor Chat]
+        TRACE_UI[Cognitive Trace Panel]
         ROAD[Roadmap]
         PROF[Profile]
     end
@@ -62,6 +63,7 @@ flowchart TB
             EVAL[Evaluator Agent]
         end
         DASH_SVC[Dashboard Service]
+        TRACE_SVC[Trace Service]
     end
     
     subgraph External["External Services"]
@@ -73,10 +75,17 @@ flowchart TB
     Frontend --> |HTTP/REST| API
     API --> Agents
     API --> DASH_SVC
-    MEM --> MONGO
+    API --> TRACE_SVC
+    
+    MEM --> |Reads/Writes| MONGO
+    TRACE_SVC --> |Logs| MONGO
+    
     PLAN --> GEMINI
     EXEC --> GEMINI
     API --> ELEVEN
+    
+    MENTOR --> API
+    TRACE_UI --> |Polls| TRACE_SVC
 ```
 
 ### Agent Pipeline
@@ -88,6 +97,14 @@ flowchart LR
     PLAN --> |strategy| EXEC[Executor Agent]
     EXEC --> |response| EVAL[Evaluator Agent]
     EVAL --> |updates| MEM
+    
+    subgraph Logging["Cognitive Trace System"]
+        MEM -.-> |[DB WRITE]| LOG[Trace Logs]
+        PLAN -.-> |[STRATEGY]| LOG
+        EXEC -.-> |[RESPONSE]| LOG
+        EVAL -.-> |[SCORE]| LOG
+    end
+    
     EXEC --> RESP[Mentor Response]
 ```
 
@@ -105,6 +122,7 @@ flowchart LR
 | shadcn/ui | Component Library |
 | Framer Motion | Animations |
 | React Router | Navigation |
+| **Trace Panel** | **System Visualization** |
 
 ### Backend
 | Technology | Purpose |
@@ -115,6 +133,7 @@ flowchart LR
 | Google Gemini | AI/LLM |
 | ElevenLabs | Text-to-Speech |
 | Pydantic | Data Validation |
+| **TraceService** | **Cognitive Logging** |
 | python-jose | JWT Auth |
 
 ### Database
@@ -248,6 +267,12 @@ gentle-guide/
 
 ## ✨ Features
 
+### 🧠 Cognitive Trace System ("Jury Mode")
+- **Live Visualization** — See the AI "think" in real-time
+- **Defensible Reasoning** — Logs every decision (Strategy, Response, Score)
+- **Data Transparency** — Explicit indicators for Database Reads/Writes
+- **Safety** — Logs usage without exposing PII/content
+
 ### 📊 Dashboard
 - **Momentum tracking** — Sessions, progress percentage, clarity trends
 - **Next focus** — AI-derived recommended next step
@@ -319,6 +344,7 @@ flowchart TD
 |----------|--------|-------------|
 | `/api/chat` | POST | Send message to mentor |
 | `/api/tts` | POST | Text-to-speech |
+| `/api/traces` | GET | **Live system activity logs** |
 
 ### Roadmap
 | Endpoint | Method | Description |
