@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
 import Logo from "@/components/Logo";
+import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 
 interface Reflection {
     id: string;
@@ -280,8 +281,8 @@ export default function MentorPage() {
                                                     key={session._id}
                                                     onClick={() => handleSelectSession(session)}
                                                     className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${chatId === session._id
-                                                            ? "bg-[#5C6B4A]/10 border border-[#5C6B4A]/30"
-                                                            : "hover:bg-[#E8DED4]/50"
+                                                        ? "bg-[#5C6B4A]/10 border border-[#5C6B4A]/30"
+                                                        : "hover:bg-[#E8DED4]/50"
                                                         }`}
                                                 >
                                                     <div className="flex-1 min-w-0">
@@ -418,6 +419,7 @@ export default function MentorPage() {
                     </div>
                 </main>
             </div>
+            <CognitiveTracePanel />
         </div>
     );
 }
