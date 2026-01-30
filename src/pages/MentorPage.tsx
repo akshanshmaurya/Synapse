@@ -109,15 +109,7 @@ export default function MentorPage() {
                 <aside className="w-64 p-6 flex flex-col fixed h-screen">
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-12">
-                        <div className="w-10 h-10 rounded-full bg-[#5C6B4A] flex items-center justify-center">
-                            <Sprout className="w-5 h-5 text-[#FDF8F3]" />
-                        </div>
-                        <div>
-                            <span className="font-serif text-lg text-[#3D3D3D]">Synapse</span>
-                            <p className="text-[10px] text-[#8B8178] uppercase tracking-wider">
-                                {isAuthenticated ? user?.name || "Growing" : "Guest Mode"}
-                            </p>
-                        </div>
+                        <img src="/logo.png" alt="Synapse" className="h-10" />
                     </div>
 
                     {/* Nav */}

@@ -49,10 +49,7 @@ export default function SignInPage() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <Link to="/" className="inline-flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-[#5C6B4A] flex items-center justify-center">
-                            <Sprout className="w-6 h-6 text-[#FDF8F3]" />
-                        </div>
-                        <span className="font-serif text-2xl text-[#3D3D3D]">Synapse</span>
+                        <img src="/logo.png" alt="Synapse" className="h-12" />
                     </Link>
                 </div>
 
