@@ -2,6 +2,12 @@
 Executor Agent
 Generates mentor responses and roadmaps using planner strategy and memory context.
 This is the main user-facing output generator.
+
+CONSTRAINTS:
+- Text responses: 6-8 lines max
+- Voice output: 5-6 lines max
+- Must obey planner controls (verbosity, tone)
+- No filler language, be concise
 """
 import google.generativeai as genai
 import os
@@ -10,6 +16,7 @@ import uuid
 from typing import Dict, Any, Optional, List
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 class ExecutorAgent:
     def __init__(self):
@@ -23,44 +30,83 @@ class ExecutorAgent:
     ) -> str:
         """
         Generate a mentor response based on context and planner strategy.
-        This is the user-facing output.
+        CONSTRAINED to 6-8 lines max for faster, focused responses.
         """
-        prompt = f"""You are a gentle, wise mentor helping someone grow in their career and life.
-Your tone should be like a patient teacher sitting beside the student — warm, unhurried, and affirming.
+        # Get planner controls
+        verbosity = strategy.get("verbosity", "normal")
+        max_lines = strategy.get("max_lines", 6)
+        pacing = strategy.get("pacing", "normal")
+        
+        # Adjust max lines based on verbosity
+        if verbosity == "brief":
+            max_lines = 4
+        elif verbosity == "detailed":
+            max_lines = 8
+        
+        prompt = f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
 
-ABOUT THIS PERSON:
-{user_context.get('context_summary', 'A person beginning their growth journey.')}
+CONTEXT:
+{user_context.get('context_summary', 'A person on their growth journey.')}
+Interests: {user_context.get('profile', {}).get('interests', [])}
+Goals: {user_context.get('profile', {}).get('goals', [])}
 
-Their interests: {user_context.get('profile', {}).get('interests', [])}
-Their goals: {user_context.get('profile', {}).get('goals', [])}
-Topics they find challenging: {[s.get('topic') for s in user_context.get('struggles', [])[:3]]}
+MESSAGE: "{current_message}"
 
-THEIR MESSAGE: "{current_message}"
-
-GUIDANCE STRATEGY (from planner):
+PLANNER CONTROLS:
 - Approach: {strategy.get('strategy', 'support')}
 - Tone: {strategy.get('tone', 'warm')}
-- Focus on: {strategy.get('focus_areas', [])}
-- Detected emotion: {strategy.get('detected_emotion', 'neutral')}
-- Should ask a question: {strategy.get('should_ask_question', True)}
+- Verbosity: {verbosity}
+- Pacing: {pacing}
+- Ask question: {strategy.get('should_ask_question', True)}
 
-RULES:
-1. Be warm, patient, and genuinely caring
-2. Use growth/garden metaphors naturally when appropriate
-3. Do NOT sound robotic or use bullet points
-4. Keep response to 2-4 paragraphs maximum
-5. If asking a question, make it thoughtful and open-ended
-6. Never lecture — guide gently
-7. Speak like a mentor, not an AI assistant
+STRICT RULES:
+1. MAX {max_lines} LINES of text - be concise
+2. No bullet points, no lists
+3. Warm but focused - no filler words
+4. If pacing is "slow", use simpler language
+5. One thoughtful question max if appropriate
+6. Sound like a mentor, not an AI
 
-Write your response to them now:"""
+Respond now (max {max_lines} lines):"""
 
         try:
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
             print(f"Executor response error: {e}")
-            return "I'm with you. Tell me more about what's on your mind, and we'll explore it together."
+            return "I'm with you. Tell me more about what's on your mind."
+    
+    def generate_voice_response(
+        self, 
+        user_context: Dict[str, Any],
+        current_message: str, 
+        strategy: Dict[str, Any]
+    ) -> str:
+        """
+        Generate a voice-optimized response (5-6 lines max).
+        Even more concise for TTS output.
+        """
+        prompt = f"""You are a gentle mentor. Respond for VOICE output.
+
+MESSAGE: "{current_message}"
+
+Approach: {strategy.get('strategy', 'support')}
+Tone: {strategy.get('tone', 'warm')}
+
+VOICE RULES:
+1. MAX 5 SHORT sentences
+2. Easy to speak naturally
+3. Warm but direct
+4. No complex words
+
+Voice response:"""
+
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Executor voice error: {e}")
+            return "I hear you. Let's explore that together."
     
     async def generate_roadmap(
         self, 
@@ -72,7 +118,6 @@ Write your response to them now:"""
         Generate a personalized learning roadmap.
         Returns structured roadmap data designed for direct frontend rendering.
         """
-        # Get user context
         from app.agents.memory_agent import MemoryAgent
         memory = MemoryAgent()
         user_context = await memory.get_user_context(user_id)
@@ -288,4 +333,3 @@ RESPOND ONLY WITH VALID JSON."""
         except Exception as e:
             print(f"Executor regenerate error: {e}")
             return None
-

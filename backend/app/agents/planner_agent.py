@@ -62,6 +62,9 @@ OUTPUT A JSON OBJECT with this structure:
     "detected_emotion": "neutral, frustrated, excited, confused, or discouraged",
     "roadmap_relevant": true or false,
     "pacing": "slow, normal, or accelerated",
+    "verbosity": "brief, normal, or detailed",
+    "max_lines": 6,
+    "voice_output_required": false,
     "chat_intent": "short 3-5 word description of what this conversation is about, e.g. 'career roadmap discussion' or 'learning python basics'",
     "memory_update": {{
         "new_interest": null or "string",
@@ -69,6 +72,11 @@ OUTPUT A JSON OBJECT with this structure:
         "struggle_detected": null or "topic string"
     }}
 }}
+
+VERBOSITY RULES:
+- Use "brief" (4 lines) for simple acknowledgments, greetings, quick encouragement
+- Use "normal" (6 lines) for standard mentoring responses
+- Use "detailed" (8 lines) ONLY for complex explanations or teaching moments
 
 IMPORTANT: Adjust your strategy based on the clarity score. Do not push forward if clarity is low.
 RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
@@ -165,6 +173,9 @@ RESPOND ONLY WITH VALID JSON."""
             "detected_emotion": "neutral",
             "roadmap_relevant": False,
             "pacing": "normal",
+            "verbosity": "normal",
+            "max_lines": 6,
+            "voice_output_required": False,
             "chat_intent": "new conversation",
             "memory_update": {
                 "new_interest": None,
