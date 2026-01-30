@@ -37,7 +37,8 @@ backend/
 │       ├── dashboard_service.py  # Dashboard insights derivation
 │       ├── tts.py                # ElevenLabs TTS
 │       ├── llm_utils.py          # LLM helpers
-│       └── prompt_templates.py   # Prompt storage
+│       ├── prompt_templates.py   # Prompt storage
+│       └── trace_service.py      # Cognitive Trace logging
 ├── requirements.txt
 └── .env
 ```
@@ -55,6 +56,7 @@ backend/
 | `roadmaps` | Learning pathways | `user_id`, `is_active` |
 | `roadmap_feedback` | Step feedback history | `roadmap_id` |
 | `agent_logs` | Debug logging | `user_id` |
+| `system_traces` | Cognitive Trace logs | `request_id`, `timestamp` |
 
 ### Key Data Models
 
@@ -129,6 +131,23 @@ backend/
 }
 ```
 
+#### Cognitive Trace Document
+
+```json
+{
+  "trace_id": "uuid",
+  "request_id": "uuid",
+  "agent": "Planner|Executor|Evaluator|Memory|Persistence",
+  "action": "Strategy Implemented|Response Generated|...",
+  "details": {
+    "strategy": "encourage",
+    "tone": "warm",
+    "clarity_score": 85
+  },
+  "timestamp": "datetime"
+}
+```
+
 ---
 
 ## 3. API Endpoints
@@ -148,6 +167,7 @@ backend/
 | GET | `/memory` | Get user memory document |
 | PUT | `/profile` | Update interests/goals |
 | GET | `/dashboard` | **NEW** Get dashboard insights |
+| GET | `/traces` | **NEW** Live system activity for Jury Mode |
 
 ### Onboarding (`/api/onboarding`)
 
