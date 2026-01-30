@@ -18,6 +18,7 @@ interface AuthContextType {
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
   checkOnboarding: () => Promise<boolean>;
+  completeOnboarding: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -159,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signup,
         logout,
         checkOnboarding,
+        completeOnboarding: () => setOnboardingComplete(true),
       }}
     >
       {children}
