@@ -16,7 +16,7 @@ interface OnboardingQuestion {
 }
 
 export default function OnboardingPage() {
-    const { token, isAuthenticated, logout, checkOnboarding } = useAuth();
+    const { token, isAuthenticated, logout, completeOnboarding } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -146,9 +146,9 @@ export default function OnboardingPage() {
             });
 
             if (response.ok) {
-                // Update AuthContext state BEFORE navigating
-                await checkOnboarding();
-                // Now navigate - ProtectedRoute will see onboardingComplete=true
+                // Optimistic update: Set local state immediately
+                completeOnboarding();
+                // Navigate instantly - background sync is already done via POST
                 navigate("/dashboard", { replace: true });
             } else {
                 const errorData = await response.json().catch(() => ({}));

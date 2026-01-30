@@ -60,12 +60,13 @@ PLANNER CONTROLS:
 - Ask question: {strategy.get('should_ask_question', True)}
 
 STRICT RULES:
-1. MAX {max_lines} LINES of text - be concise
-2. No bullet points, no lists
-3. Warm but focused - no filler words
-4. If pacing is "slow", use simpler language
-5. One thoughtful question max if appropriate
-6. Sound like a mentor, not an AI
+1. DEFAULT STYLE: Point-to-point explanations. One sentence per point.
+2. Paragraphs allowed ONLY for emotional reassurance or motivation.
+3. MAX {max_lines} LINES total.
+4. Stop once clarity is achieved. Do not over-explain.
+5. Avoid repetition and filler.
+6. If pacing is "slow", use simpler language.
+7. One thoughtful question max if appropriate.
 
 Respond now (max {max_lines} lines):"""
 

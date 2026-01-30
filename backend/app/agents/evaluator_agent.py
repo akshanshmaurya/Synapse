@@ -43,12 +43,17 @@ STUDENT CONTEXT:
 
 IMPORTANT: Evaluate UNDERSTANDING QUALITY, not just activity or effort.
 - clarity_score: How well does the student understand the material? (0-100)
-- confusion_trend: Is confusion improving, stable, or worsening compared to recent history?
-- understanding_delta: Change in understanding from previous session (-10 to +10)
-- stagnation_flags: Topics where no progress is being made
+- confusion_trend: Is confusion improving, stable, or worsening?
+- understanding_delta: Change in understanding (-10 to +10)
+- stagnation_flags: Topics where NO progress is being made.
+
+CORE PHILOSOPHY:
+- Momentum comes from clarity improvement + independence, NOT just session count.
+- Output signals and scores, NOT narratives.
+- Be a strict judge of learning quality.
 
 OUTPUT AS JSON:
-{{
+{
     "clarity_score": 0-100,
     "confusion_trend": "improving" or "stable" or "worsening",
     "understanding_delta": -10 to +10,
@@ -62,9 +67,9 @@ OUTPUT AS JSON:
     "new_interest_detected": null or "new interest mentioned",
     "stage_change_recommended": null or "new stage suggestion",
     "pace_adjustment": null or "slow_down" or "speed_up" or "maintain"
-}}
+}
 
-BE HONEST. Do not inflate clarity_score if the student is confused.
+BE HONEST. Do not inflate clarity_score.
 RESPOND ONLY WITH VALID JSON."""
 
         try:
