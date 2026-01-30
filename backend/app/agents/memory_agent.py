@@ -51,42 +51,7 @@ class MemoryAgent:
         
         return context
     
-    async def store_interaction(
-        self, 
-        user_id: str, 
-        session_id: str,
-        user_message: str, 
-        mentor_response: str,
-        planner_strategy: Optional[Dict] = None,
-        evaluator_insights: Optional[Dict] = None
-    ):
-        """Store an interaction in the database"""
-        interactions = get_interactions_collection()
-        
-        interaction_doc = {
-            "user_id": user_id,
-            "session_id": session_id,
-            "user_message": user_message,
-            "mentor_response": mentor_response,
-            "planner_strategy": planner_strategy,
-            "evaluator_insights": evaluator_insights,
-            "created_at": datetime.utcnow()
-        }
-        
-        await interactions.insert_one(interaction_doc)
-        
-        # Update progress count
-        memory_collection = get_user_memory_collection()
-        await memory_collection.update_one(
-            {"user_id": user_id},
-            {
-                "$inc": {"progress.total_interactions": 1},
-                "$set": {
-                    "progress.last_session": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-            }
-        )
+
     
     async def update_struggle(
         self, 
