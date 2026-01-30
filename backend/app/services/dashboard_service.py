@@ -139,12 +139,14 @@ class DashboardService:
         onboarding = memory.get("onboarding", {})
         
         momentum = self._derive_momentum(progress, roadmap, profile)
+        effort = self._derive_effort_display(progress)  # NEW: Separate effort display
         next_bloom = self._derive_next_bloom(roadmap, profile)
         recent_signals = self._derive_recent_signals(struggles, recent_interactions, progress, profile)
         daily_nurture = self._derive_daily_nurture(progress, recent_interactions, struggles, profile)
         
         return {
             "momentum": momentum,
+            "effort": effort,  # NEW: Effort section (separate from momentum)
             "next_bloom": next_bloom,
             "recent_signals": recent_signals,
             "show_daily_nurture": daily_nurture["show"],
@@ -158,10 +160,18 @@ class DashboardService:
                 "state": "starting",
                 "insight": random.choice(self.MOMENTUM_INSIGHTS["starting"]),
                 "metrics": {
-                    "sessions_this_week": 0,
-                    "roadmap_progress": 0,
-                    "clarity_trend": "moderate"
+                    "clarity_score": 0,
+                    "understanding_trend": "stable",
+                    "understanding_delta": 0,
+                    "evaluation_count": 0
                 }
+            },
+            "effort": {
+                "sessions_this_week": 0,
+                "total_sessions": 0,
+                "consistency_streak": 0,
+                "persistence_label": "New",
+                "note": "Effort reflects activity, not understanding."
             },
             "next_bloom": None,
             "recent_signals": [],
@@ -171,87 +181,150 @@ class DashboardService:
     
     def _derive_momentum(self, progress: Dict, roadmap: Optional[Dict], profile: Dict) -> Dict[str, Any]:
         """
-        Derive momentum state from raw signals.
-        Uses range-based logic with personalized messaging.
+        Derive momentum from EVALUATOR outputs, not session counts.
+        Momentum = understanding quality, not effort.
+        
+        This is the critical change: momentum reflects comprehension,
+        not how much time/effort the user is spending.
         """
+        evaluation_history = progress.get("evaluation_history", [])
+        effort_metrics = progress.get("effort_metrics", {})
+        
+        # If no evaluations yet, show starting state
+        if not evaluation_history:
+            return self._starting_momentum()
+        
+        # Get recent evaluations (last 5)
+        recent = evaluation_history[-5:]
+        
+        # Calculate average clarity score (0-100)
+        avg_clarity = sum(e.get("clarity_score", 50) for e in recent) / len(recent)
+        
+        # Get latest confusion trend
+        latest = recent[-1] if recent else {}
+        confusion_trend = latest.get("confusion_trend", "stable")
+        understanding_delta = latest.get("understanding_delta", 0)
+        
+        # Classify momentum based on UNDERSTANDING, not activity
+        if avg_clarity >= 70 and confusion_trend == "improving":
+            state = "accelerating"
+        elif avg_clarity >= 50 and confusion_trend != "worsening":
+            state = "steady"
+        elif avg_clarity >= 30 or confusion_trend == "improving":
+            state = "building"
+        else:
+            state = "struggling"  # Honest about lack of progress
+        
+        # Generate TRUTHFUL insight (not motivational)
+        insight = self._generate_truthful_insight(
+            state, avg_clarity, confusion_trend, understanding_delta, effort_metrics
+        )
+        
+        return {
+            "state": state,
+            "insight": insight,
+            "metrics": {
+                "clarity_score": int(avg_clarity),
+                "understanding_trend": confusion_trend,
+                "understanding_delta": understanding_delta,
+                "evaluation_count": len(evaluation_history)
+            }
+        }
+    
+    def _starting_momentum(self) -> Dict[str, Any]:
+        """Return starting momentum for new users with no evaluations"""
+        return {
+            "state": "starting",
+            "insight": random.choice(self.MOMENTUM_INSIGHTS["starting"]),
+            "metrics": {
+                "clarity_score": 0,
+                "understanding_trend": "stable",
+                "understanding_delta": 0,
+                "evaluation_count": 0
+            }
+        }
+    
+    def _generate_truthful_insight(
+        self, 
+        state: str, 
+        clarity: float, 
+        confusion_trend: str,
+        understanding_delta: int,
+        effort_metrics: Dict
+    ) -> str:
+        """
+        Generate honest, non-exaggerated insight.
+        Honesty > motivation.
+        """
+        sessions = effort_metrics.get("total_sessions", 0)
+        streak = effort_metrics.get("consistency_streak", 0)
+        
+        # High effort + low clarity = hardworking but stuck
+        if sessions > 5 and clarity < 40:
+            return f"High effort with {sessions} sessions, but clarity remains challenging at {int(clarity)}%. Consider revisiting fundamentals or trying a different approach."
+        
+        # High effort + high clarity = efficient
+        if sessions > 5 and clarity >= 70:
+            return f"Strong understanding ({int(clarity)}% clarity) with consistent {sessions} sessions. Your effort is translating to comprehension."
+        
+        # Low effort + high clarity = efficient learner
+        if sessions <= 3 and clarity >= 60:
+            return f"Efficient learning: {int(clarity)}% clarity achieved with minimal sessions. Quality over quantity."
+        
+        # Improving trend
+        if confusion_trend == "improving" and understanding_delta > 0:
+            return f"Clarity improving (+{understanding_delta} points). The concepts are becoming clearer."
+        
+        # Worsening trend - be honest
+        if confusion_trend == "worsening":
+            return f"Understanding appears to be declining. Current clarity: {int(clarity)}%. This is normal - consider slowing down."
+        
+        # Stable/building
+        if state == "building":
+            return f"Building understanding: {int(clarity)}% clarity. Progress is gradual but present."
+        
+        # Default steady
+        return f"Steady progress at {int(clarity)}% clarity. Understanding is {confusion_trend}."
+    
+    def _derive_effort_display(self, progress: Dict) -> Dict[str, Any]:
+        """
+        Derive effort metrics for separate display (not conflated with momentum).
+        This shows activity metrics honestly, without implying they equal progress.
+        """
+        effort = progress.get("effort_metrics", {})
+        session_dates = progress.get("session_dates", [])
         now = datetime.utcnow()
         week_ago = now - timedelta(days=7)
         
         # Calculate sessions in last 7 days
-        session_dates = progress.get("session_dates", [])
         sessions_this_week = sum(
             1 for d in session_dates 
             if isinstance(d, datetime) and d >= week_ago
         )
         
-        # Calculate days since last session
-        last_session = progress.get("last_session")
-        days_since_session = None
-        if isinstance(last_session, datetime):
-            days_since_session = (now - last_session).days
-        
-        # Calculate roadmap progress
-        roadmap_progress = 0
-        if roadmap:
-            total_steps = roadmap.get("total_steps", 0)
-            completed_steps = roadmap.get("completed_steps", 0)
-            if total_steps > 0:
-                roadmap_progress = int((completed_steps / total_steps) * 100)
-        
-        # Calculate clarity trend
-        confusion_count = progress.get("confusion_count", 0)
-        clarity_count = progress.get("clarity_reached_count", 0)
-        total_interactions = progress.get("total_interactions", 0)
-        
-        if total_interactions == 0:
-            clarity_trend = "moderate"
-        elif clarity_count >= confusion_count:
-            clarity_trend = "high"
-        elif confusion_count > clarity_count * 2:
-            clarity_trend = "low"
-        else:
-            clarity_trend = "moderate"
-        
-        # Determine momentum state with returning user detection
-        if days_since_session and days_since_session > 7 and sessions_this_week == 0:
-            state = "returning"
-            template = random.choice(self.MOMENTUM_INSIGHTS.get("returning", self.MOMENTUM_INSIGHTS["starting"]))
-            insight = template.format(days=days_since_session)
-        elif sessions_this_week >= 5 and clarity_trend == "high":
-            state = "accelerating"
-            template = random.choice(self.MOMENTUM_INSIGHTS["accelerating"])
-            insight = template.format(sessions=sessions_this_week)
-        elif sessions_this_week >= 3 and roadmap_progress > 30:
-            state = "steady"
-            template = random.choice(self.MOMENTUM_INSIGHTS["steady"])
-            insight = template.format(progress=roadmap_progress, sessions=sessions_this_week)
-        elif sessions_this_week >= 1:
-            state = "building"
-            template = random.choice(self.MOMENTUM_INSIGHTS["building"])
-            insight = template.format(
-                sessions=sessions_this_week, 
-                s="s" if sessions_this_week > 1 else ""
-            )
-        else:
-            state = "starting"
-            insight = random.choice(self.MOMENTUM_INSIGHTS["starting"])
-        
-        # Adjust insight based on learning pace preference
-        learning_pace = profile.get("learning_pace", "moderate")
-        if learning_pace == "fast" and state in ["building", "steady"]:
-            insight += " Keep pushing forward."
-        elif learning_pace == "slow" and state in ["building", "steady"]:
-            insight += " Take your time."
-        
         return {
-            "state": state if state != "returning" else "starting",  # Map returning to starting for frontend
-            "insight": insight,
-            "metrics": {
-                "sessions_this_week": sessions_this_week,
-                "roadmap_progress": roadmap_progress,
-                "clarity_trend": clarity_trend
-            }
+            "sessions_this_week": sessions_this_week,
+            "total_sessions": effort.get("total_sessions", 0),
+            "consistency_streak": effort.get("consistency_streak", 0),
+            "persistence_label": self._get_effort_label(effort),
+            "note": "Effort reflects activity, not understanding."
         }
+    
+    def _get_effort_label(self, effort: Dict) -> str:
+        """Get a factual effort description"""
+        sessions = effort.get("total_sessions", 0)
+        streak = effort.get("consistency_streak", 0)
+        
+        if streak >= 7:
+            return "Highly consistent"
+        elif streak >= 3:
+            return "Building consistency"
+        elif sessions >= 10:
+            return "Active"
+        elif sessions >= 3:
+            return "Getting started"
+        else:
+            return "New"
     
     def _derive_next_bloom(self, roadmap: Optional[Dict], profile: Dict) -> Optional[Dict[str, Any]]:
         """

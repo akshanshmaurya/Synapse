@@ -70,7 +70,17 @@ class AgentOrchestrator:
             # 7. Update memory based on evaluation
             await self.evaluator_agent.update_memory_from_evaluation(user_id, evaluation)
             
-            # 8. Store the interaction
+            # 8. Store evaluation result for trend analysis
+            await self.memory_agent.store_evaluation_result(user_id, evaluation)
+            
+            # 9. Update effort metrics (session occurred)
+            await self.memory_agent.update_effort_metrics(user_id, session_occurred=True)
+            
+            # 10. Periodically update learner traits (every 5 interactions)
+            if user_context.get("progress", {}).get("total_interactions", 0) % 5 == 0:
+                await self.memory_agent.update_learner_traits(user_id)
+            
+            # 11. Store the interaction
             await self.memory_agent.store_interaction(
                 user_id=user_id,
                 session_id=session_id,

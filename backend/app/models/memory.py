@@ -23,6 +23,23 @@ class Struggle(BaseModel):
     last_seen: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
 
+class EvaluationSnapshot(BaseModel):
+    """Single point-in-time evaluation from the Evaluator agent"""
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    clarity_score: int = 50  # 0-100: overall understanding quality
+    confusion_trend: str = "stable"  # improving, stable, worsening
+    understanding_delta: int = 0  # -10 to +10 change from previous
+    stagnation_flags: List[str] = []  # topics with no progress
+    engagement_level: str = "medium"  # high, medium, low
+
+class EffortMetrics(BaseModel):
+    """Tracks effort signals separately from understanding"""
+    total_sessions: int = 0
+    total_retries: int = 0  # roadmap step retries
+    persistence_score: int = 50  # 0-100, derived from retry patterns
+    consistency_streak: int = 0  # consecutive days with sessions
+    last_session_date: Optional[datetime] = None
+
 class Milestone(BaseModel):
     """Achievement or milestone reached"""
     id: str
@@ -42,6 +59,9 @@ class UserProfile(BaseModel):
     abstraction_level: str = "moderate"  # concrete, moderate, abstract
     autonomy: str = "guided"  # guided, semi-autonomous, self-directed
     confidence_trend: str = "stable"  # declining, stable, growing
+    # Long-term learner traits (derived from evaluator history)
+    perseverance: str = "moderate"  # low, moderate, high
+    frustration_tolerance: str = "moderate"  # low, moderate, high
 
 class UserProgress(BaseModel):
     """User progress tracking"""
@@ -53,10 +73,14 @@ class UserProgress(BaseModel):
     roadmap_regeneration_count: int = 0  # Track how many times roadmap was regenerated
     # Session tracking for consistency calculation
     session_dates: List[datetime] = []
-    # Clarity/confusion tracking
+    # Clarity/confusion tracking (legacy, kept for compatibility)
     confusion_count: int = 0
     clarity_reached_count: int = 0
     time_to_clarity_avg: float = 0.0  # Average messages until confusion resolves
+    # NEW: Evaluator-driven metrics
+    evaluation_history: List[EvaluationSnapshot] = []  # Last N evaluations (max 20)
+    effort_metrics: EffortMetrics = Field(default_factory=EffortMetrics)
+    current_momentum_state: str = "unknown"  # Cached momentum classification
 
 class UserMemory(BaseModel):
     """Complete user memory document"""

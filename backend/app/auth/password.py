@@ -1,32 +1,60 @@
 """
 Password Hashing Utilities
-Uses bcrypt for secure password hashing.
-To bypass the 72-byte limit of bcrypt, we pre-hash the password with SHA-256.
+
+Design:
+- Supports passwords of arbitrary length
+- Avoids bcrypt's 72-byte input limit via SHA-256 pre-hashing
+- Uses passlib for safe salt handling and verification
+- Ensures bcrypt NEVER sees raw user input
+
+Hash scheme:
+bcrypt( base64( SHA256( UTF-8(password) ) ) )
 """
+
 from passlib.context import CryptContext
 import hashlib
 import base64
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# CryptContext allows future algorithm upgrades without breaking hashes
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+)
 
 def _prepare_password(password: str) -> str:
     """
-    Pre-hash password with SHA-256 and base64 encode it.
-    This bypasses bcrypt's 72-character limit and avoids null-byte issues.
+    Normalize and pre-hash password.
+
+    Steps:
+    1. UTF-8 encode (strict)
+    2. SHA-256 hash (fixed 32 bytes)
+    3. Base64 encode (ASCII-safe, ~44 chars)
+
+    Output is ALWAYS safe for bcrypt input.
     """
-    sha256_hash = hashlib.sha256(password.encode('utf-8')).digest()
-    return base64.b64encode(sha256_hash).decode('utf-8')
+    if not isinstance(password, str):
+        raise TypeError("Password must be a string")
+
+    sha256_digest = hashlib.sha256(
+        password.encode("utf-8", errors="strict")
+    ).digest()
+
+    return base64.b64encode(sha256_digest).decode("ascii")
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt (after SHA-256 pre-hashing)"""
-    try:
-        prepared = _prepare_password(password)
-        return pwd_context.hash(prepared)
-    except Exception as e:
-        print(f"CRITICAL PASSWORD HASHING ERROR: {e}")
-        raise e
+    """
+    Hash a password for storage.
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash (after SHA-256 pre-hashing)"""
+    Accepts passwords of any length.
+    """
+    prepared = _prepare_password(password)
+    return pwd_context.hash(prepared)
+
+def verify_password(plain_password: str, stored_hash: str) -> bool:
+    """
+    Verify a password against a stored hash.
+
+    Uses the same pre-hashing pipeline as hash_password().
+    """
     prepared = _prepare_password(plain_password)
-    return pwd_context.verify(prepared, hashed_password)
+    return pwd_context.verify(prepared, stored_hash)

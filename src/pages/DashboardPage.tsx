@@ -38,17 +38,18 @@ export default function DashboardPage() {
         switch (state) {
             case "accelerating": return "Accelerating";
             case "steady": return "Steady Growth";
-            case "building": return "Building Rhythm";
+            case "building": return "Building Understanding";
+            case "struggling": return "Needs Attention";  // NEW: Honest state
             default: return "Just Beginning";
         }
     };
 
-    // Map clarity trend to display
-    const getClarityDisplay = (trend: string) => {
+    // Map understanding trend to display
+    const getTrendDisplay = (trend: string) => {
         switch (trend) {
-            case "high": return "High";
-            case "low": return "Needs attention";
-            default: return "Moderate";
+            case "improving": return "Improving";
+            case "worsening": return "Declining";
+            default: return "Stable";
         }
     };
 
@@ -132,7 +133,7 @@ export default function DashboardPage() {
                             </div>
                         ) : dashboard ? (
                             <>
-                                {/* Momentum Section */}
+                                {/* Understanding Section */}
                                 <motion.section
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -154,7 +155,7 @@ export default function DashboardPage() {
                                                         initial={{ pathLength: 0 }}
                                                         animate={{ pathLength: 1 }}
                                                         transition={{ duration: 2, ease: "easeOut" }}
-                                                        d={dashboard.momentum.state === "starting"
+                                                        d={dashboard.momentum.state === "starting" || dashboard.momentum.state === "struggling"
                                                             ? "M 10 140 Q 30 130 50 135 T 90 120"
                                                             : dashboard.momentum.state === "building"
                                                                 ? "M 10 140 Q 30 110 50 115 T 90 90"
@@ -162,7 +163,7 @@ export default function DashboardPage() {
                                                                     ? "M 10 140 Q 30 100 50 105 T 90 70"
                                                                     : "M 10 140 Q 30 90 50 80 T 90 40"
                                                         }
-                                                        stroke="#5C6B4A"
+                                                        stroke={dashboard.momentum.state === "struggling" ? "#D4A574" : "#5C6B4A"}
                                                         strokeWidth="3"
                                                         fill="none"
                                                         strokeLinecap="round"
@@ -172,7 +173,7 @@ export default function DashboardPage() {
                                                         animate={{ scale: 1 }}
                                                         transition={{ duration: 0.5, delay: 1.5 }}
                                                         cx="90"
-                                                        cy={dashboard.momentum.state === "starting" ? "120"
+                                                        cy={dashboard.momentum.state === "starting" || dashboard.momentum.state === "struggling" ? "120"
                                                             : dashboard.momentum.state === "building" ? "90"
                                                                 : dashboard.momentum.state === "steady" ? "70" : "40"}
                                                         r="6"
@@ -182,10 +183,10 @@ export default function DashboardPage() {
                                             </div>
                                         </div>
 
-                                        {/* Momentum Info */}
+                                        {/* Understanding Info */}
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-4">
-                                                <span className="text-xs uppercase tracking-wider text-[#8B8178]">Current Momentum</span>
+                                                <span className="text-xs uppercase tracking-wider text-[#8B8178]">Understanding</span>
                                             </div>
                                             <h2 className="font-serif text-3xl text-[#3D3D3D] mb-2">
                                                 {getMomentumLabel(dashboard.momentum.state)}
@@ -198,24 +199,52 @@ export default function DashboardPage() {
                                                 <div className="flex items-center gap-2">
                                                     <Sun className="w-4 h-4 text-[#D4A574]" />
                                                     <span className="text-sm text-[#8B8178]">
-                                                        Clarity: {getClarityDisplay(dashboard.momentum.metrics.clarity_trend)}
+                                                        Clarity: {dashboard.momentum.metrics.clarity_score}%
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Droplets className="w-4 h-4 text-[#5C6B4A]" />
+                                                    <Wind className="w-4 h-4 text-[#5C6B4A]" />
                                                     <span className="text-sm text-[#8B8178]">
-                                                        Sessions: {dashboard.momentum.metrics.sessions_this_week} this week
+                                                        Trend: {getTrendDisplay(dashboard.momentum.metrics.understanding_trend)}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Wind className="w-4 h-4 text-[#8B8178]" />
-                                                    <span className="text-sm text-[#8B8178]">
-                                                        Progress: {dashboard.momentum.metrics.roadmap_progress}%
-                                                    </span>
-                                                </div>
+                                                {dashboard.momentum.metrics.understanding_delta !== 0 && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Droplets className="w-4 h-4 text-[#8B8178]" />
+                                                        <span className="text-sm text-[#8B8178]">
+                                                            Change: {dashboard.momentum.metrics.understanding_delta > 0 ? "+" : ""}{dashboard.momentum.metrics.understanding_delta}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
+                                </motion.section>
+
+                                {/* Effort Section - Separate from Understanding */}
+                                <motion.section
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.6, delay: 0.15 }}
+                                    className="bg-white/40 backdrop-blur-sm rounded-3xl p-6 border border-[#E8DED4]"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs uppercase tracking-wider text-[#8B8178]">Effort</span>
+                                            <span className="text-xs text-[#8B8178]/60">({dashboard.effort.persistence_label})</span>
+                                        </div>
+                                        <div className="flex gap-6">
+                                            <span className="text-sm text-[#8B8178]">
+                                                {dashboard.effort.sessions_this_week} sessions this week
+                                            </span>
+                                            <span className="text-sm text-[#8B8178]">
+                                                {dashboard.effort.consistency_streak} day streak
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-[#8B8178]/50 mt-2">
+                                        {dashboard.effort.note}
+                                    </p>
                                 </motion.section>
 
                                 {/* Two Column Layout */}
