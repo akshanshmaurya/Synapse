@@ -1,8 +1,9 @@
 import { motion, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Leaf, LogIn, UserPlus, Check, ArrowRight } from "lucide-react";
+import { LogIn, UserPlus, Check, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRef } from "react";
+import Logo from "@/components/Logo";
 
 // Scroll-reveal wrapper component
 function ScrollReveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
@@ -70,7 +71,7 @@ export default function LandingPage() {
                     transition={{ duration: 0.6, ease: "easeOut" }}
                     className="flex items-center"
                 >
-                    <img src="/logo.png" alt="Synapse" className="h-10" />
+                    <Logo size="md" />
                 </motion.div>
 
                 <motion.div
@@ -547,7 +548,7 @@ export default function LandingPage() {
             <footer className="py-8 px-6 bg-[#3D3D3D] text-white/60">
                 <div className="max-w-5xl mx-auto text-center">
                     <div className="flex items-center justify-center gap-3 mb-4">
-                        <img src="/logo.png" alt="Synapse" className="h-8 brightness-0 invert opacity-80" />
+                        <Logo size="md" variant="light" linkToHome={false} />
                     </div>
                     <p className="text-sm font-light">
                         For students and early professionals finding their way.
