@@ -1,7 +1,12 @@
 """
 Agent Orchestrator
 Coordinates all agents to process user messages and manage sessions.
+Uses ChatService for message storage and context management.
+
+CRITICAL: Messages are saved synchronously BEFORE returning response.
+Evaluator and memory updates run asynchronously to not block the user.
 """
+import asyncio
 import uuid
 from typing import Dict, Any, Optional
 
@@ -9,6 +14,9 @@ from app.agents.memory_agent import MemoryAgent
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.evaluator_agent import EvaluatorAgent
+from app.services.chat_service import chat_service
+from app.models.chat import MessageSender
+
 
 class AgentOrchestrator:
     def __init__(self):
@@ -16,26 +24,107 @@ class AgentOrchestrator:
         self.planner_agent = PlannerAgent()
         self.executor_agent = ExecutorAgent()
         self.evaluator_agent = EvaluatorAgent()
-        self.sessions: Dict[str, str] = {}  # user_id -> session_id
     
-    def get_session_id(self, user_id: str) -> str:
-        """Get or create a session ID for a user"""
-        if user_id not in self.sessions:
-            self.sessions[user_id] = str(uuid.uuid4())
-        return self.sessions[user_id]
-    
-    async def process_message_async(self, user_id: str, message: str) -> str:
+    async def process_message_async(
+        self, 
+        user_id: str, 
+        message: str,
+        chat_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Async version of message processing.
-        Coordinates all agents to generate a response.
+        
+        CRITICAL ORDER:
+        1. Save user message (synchronous)
+        2. Get context and generate response
+        3. Save mentor response (synchronous)
+        4. Return to user immediately
+        5. Evaluator/memory runs async (non-blocking)
         """
-        session_id = self.get_session_id(user_id)
+        # Get or create chat session
+        if not chat_id:
+            chat_id = await chat_service.get_or_create_active_chat(user_id)
         
         try:
-            # 1. Get user context from memory
-            user_context = await self.memory_agent.get_user_context(user_id)
+            # ========== STEP 1: SAVE USER MESSAGE IMMEDIATELY ==========
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                sender=MessageSender.USER,
+                content=message
+            )
             
-            # 2. Check for immediate struggles
+            # ========== STEP 2: GET CONTEXT ==========
+            user_context = await self.memory_agent.get_user_context(user_id)
+            recent_context = await chat_service.format_context_for_llm(chat_id, n=10)
+            user_context["recent_chat"] = recent_context
+            
+            # Check message count to determine if this is first message
+            msg_count = await chat_service.get_message_count(chat_id)
+            is_first_message = msg_count <= 1
+            
+            # ========== STEP 3: PLANNER (includes chat_intent) ==========
+            strategy = self.planner_agent.plan_response(user_context, message)
+            
+            # ========== STEP 4: EXECUTOR (generates response + title) ==========
+            response = self.executor_agent.generate_response(user_context, message, strategy)
+            
+            # ========== STEP 5: SAVE MENTOR RESPONSE IMMEDIATELY ==========
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                sender=MessageSender.MENTOR,
+                content=response,
+                metadata={"planner_strategy": strategy}
+            )
+            
+            # ========== STEP 6: UPDATE CHAT TITLE (first message only) ==========
+            if is_first_message:
+                chat_intent = strategy.get("chat_intent", "")
+                chat_title = self._generate_chat_title(message, chat_intent)
+                await chat_service.update_chat_title(chat_id, chat_title)
+            
+            # ========== STEP 7: PREPARE RESULT (return immediately after this) ==========
+            result = {
+                "response": response,
+                "chat_id": chat_id
+            }
+            
+            # ========== STEP 8: ASYNC BACKGROUND TASKS (don't block response) ==========
+            # Fire and forget - user gets response immediately
+            asyncio.create_task(self._run_background_tasks(
+                user_id=user_id,
+                message=message,
+                response=response,
+                user_context=user_context,
+                strategy=strategy
+            ))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Orchestrator error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "response": "I sense something stirred in our conversation. Let's pause for a moment — share with me what you were thinking, and we'll find our way together.",
+                "chat_id": chat_id
+            }
+    
+    async def _run_background_tasks(
+        self,
+        user_id: str,
+        message: str,
+        response: str,
+        user_context: Dict,
+        strategy: Dict
+    ):
+        """
+        Run evaluator and memory updates asynchronously.
+        These NEVER block the user from getting their response.
+        """
+        try:
+            # Struggle detection
             struggle_check = self.evaluator_agent.detect_struggle(message)
             if struggle_check.get("is_struggle") and struggle_check.get("topic"):
                 await self.memory_agent.update_struggle(
@@ -44,10 +133,7 @@ class AgentOrchestrator:
                     struggle_check.get("severity", "mild")
                 )
             
-            # 3. Generate strategy with planner
-            strategy = self.planner_agent.plan_response(user_context, message)
-            
-            # 4. Update memory if planner detected new info
+            # Memory updates from planner
             memory_update = strategy.get("memory_update", {})
             if memory_update.get("new_interest"):
                 interests = user_context.get("profile", {}).get("interests", [])
@@ -61,42 +147,42 @@ class AgentOrchestrator:
                     goals.append(memory_update["new_goal"])
                     await self.memory_agent.update_profile(user_id, goals=goals)
             
-            # 5. Generate response with executor
-            response = self.executor_agent.generate_response(user_context, message, strategy)
-            
-            # 6. Evaluate the interaction
+            # Evaluate the interaction
             evaluation = self.evaluator_agent.evaluate_interaction(message, response, user_context)
             
-            # 7. Update memory based on evaluation
+            # Update memory based on evaluation (insights only)
             await self.evaluator_agent.update_memory_from_evaluation(user_id, evaluation)
             
-            # 8. Store evaluation result for trend analysis
+            # Store evaluation result for trend analysis
             await self.memory_agent.store_evaluation_result(user_id, evaluation)
             
-            # 9. Update effort metrics (session occurred)
+            # Update effort metrics
             await self.memory_agent.update_effort_metrics(user_id, session_occurred=True)
             
-            # 10. Periodically update learner traits (every 5 interactions)
+            # Periodically update learner traits
             if user_context.get("progress", {}).get("total_interactions", 0) % 5 == 0:
                 await self.memory_agent.update_learner_traits(user_id)
-            
-            # 11. Store the interaction
-            await self.memory_agent.store_interaction(
-                user_id=user_id,
-                session_id=session_id,
-                user_message=message,
-                mentor_response=response,
-                planner_strategy=strategy,
-                evaluator_insights=evaluation
-            )
-            
-            return response
-            
+                
         except Exception as e:
-            print(f"Orchestrator error: {e}")
-            return "I sense something stirred in our conversation. Let's pause for a moment — share with me what you were thinking, and we'll find our way together."
+            print(f"Background task error (non-critical): {e}")
     
-    def process_message(self, user_id: str, message: str) -> str:
+    def _generate_chat_title(self, first_message: str, chat_intent: str) -> str:
+        """
+        Generate a human-readable title for the chat.
+        Uses chat_intent from planner if available, otherwise extracts from message.
+        """
+        if chat_intent:
+            # Convert intent to title case
+            return chat_intent.title()
+        
+        # Fallback: extract from first message
+        words = first_message.split()[:6]
+        title = " ".join(words)
+        if len(first_message.split()) > 6:
+            title += "..."
+        return title if title else "New Conversation"
+    
+    def process_message(self, user_id: str, message: str, chat_id: Optional[str] = None) -> str:
         """
         Sync wrapper for backward compatibility.
         """
@@ -109,13 +195,14 @@ class AgentOrchestrator:
             asyncio.set_event_loop(loop)
         
         if loop.is_running():
-            # We're already in an async context
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(
                     asyncio.run, 
-                    self.process_message_async(user_id, message)
+                    self.process_message_async(user_id, message, chat_id)
                 )
-                return future.result()
+                result = future.result()
+                return result.get("response", "")
         else:
-            return loop.run_until_complete(self.process_message_async(user_id, message))
+            result = loop.run_until_complete(self.process_message_async(user_id, message, chat_id))
+            return result.get("response", "")

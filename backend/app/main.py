@@ -56,10 +56,12 @@ app.add_middleware(
 from app.routes.auth import router as auth_router
 from app.routes.roadmap import router as roadmap_router
 from app.routes.onboarding import router as onboarding_router
+from app.routes.chat_history import router as chat_history_router
 
 app.include_router(auth_router)
 app.include_router(roadmap_router)
 app.include_router(onboarding_router)
+app.include_router(chat_history_router)
 
 # Orchestrator instance
 orchestrator = AgentOrchestrator()
@@ -68,9 +70,11 @@ orchestrator = AgentOrchestrator()
 
 class ChatRequest(BaseModel):
     message: str
+    chat_id: str = None  # Optional: continue existing chat
 
 class ChatResponse(BaseModel):
     response: str
+    chat_id: str = None  # Session ID for frontend to track
     requires_onboarding: bool = False
 
 class TTSRequest(BaseModel):
@@ -100,6 +104,7 @@ async def chat_endpoint(
     """
     Main chat endpoint - requires authentication.
     BLOCKS access until onboarding is complete.
+    Returns chat_id for session tracking.
     """
     user_id = str(current_user["_id"])
     
@@ -111,8 +116,15 @@ async def chat_endpoint(
         )
     
     try:
-        response_text = await orchestrator.process_message_async(user_id, request.message)
-        return ChatResponse(response=response_text)
+        result = await orchestrator.process_message_async(
+            user_id, 
+            request.message,
+            chat_id=request.chat_id
+        )
+        return ChatResponse(
+            response=result["response"],
+            chat_id=result["chat_id"]
+        )
     except Exception as e:
         print(f"Chat API Error: {e}")
         return ChatResponse(
