@@ -89,13 +89,21 @@ export const fetchUserMemory = async (): Promise<any> => {
 // Dashboard Data Types
 export interface DashboardData {
     momentum: {
-        state: "starting" | "building" | "steady" | "accelerating";
+        state: "starting" | "building" | "steady" | "accelerating" | "struggling";
         insight: string;
         metrics: {
-            sessions_this_week: number;
-            roadmap_progress: number;
-            clarity_trend: "low" | "moderate" | "high";
+            clarity_score: number;  // 0-100: understanding quality
+            understanding_trend: "improving" | "stable" | "worsening";
+            understanding_delta: number;  // -10 to +10
+            evaluation_count: number;
         };
+    };
+    effort: {  // NEW: Separate effort section
+        sessions_this_week: number;
+        total_sessions: number;
+        consistency_streak: number;
+        persistence_label: string;
+        note: string;
     };
     next_bloom: {
         title: string;

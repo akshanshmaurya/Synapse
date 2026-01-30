@@ -189,3 +189,128 @@ Write a warm, person-focused summary (not a list). Start with their stage of gro
         except Exception as e:
             print(f"Memory Agent error: {e}")
             return ""
+    
+    async def store_evaluation_result(self, user_id: str, evaluation: Dict[str, Any]):
+        """
+        Store an evaluation snapshot to history.
+        Keeps last 20 evaluations for trend analysis.
+        """
+        memory_collection = get_user_memory_collection()
+        
+        # Create evaluation snapshot
+        snapshot = {
+            "timestamp": datetime.utcnow(),
+            "clarity_score": evaluation.get("clarity_score", 50),
+            "confusion_trend": evaluation.get("confusion_trend", "stable"),
+            "understanding_delta": evaluation.get("understanding_delta", 0),
+            "stagnation_flags": evaluation.get("stagnation_flags", []),
+            "engagement_level": evaluation.get("engagement_level", "medium")
+        }
+        
+        # Add to history (push and slice to keep max 20)
+        await memory_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$push": {
+                    "progress.evaluation_history": {
+                        "$each": [snapshot],
+                        "$slice": -20  # Keep only last 20
+                    }
+                },
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+    
+    async def update_effort_metrics(self, user_id: str, session_occurred: bool = True):
+        """
+        Update effort tracking metrics.
+        Tracks sessions, consistency streaks, and persistence.
+        """
+        memory_collection = get_user_memory_collection()
+        memory = await memory_collection.find_one({"user_id": user_id})
+        
+        if not memory:
+            return
+        
+        effort = memory.get("progress", {}).get("effort_metrics", {})
+        now = datetime.utcnow()
+        last_session = effort.get("last_session_date")
+        
+        # Calculate consistency streak
+        current_streak = effort.get("consistency_streak", 0)
+        if last_session:
+            if isinstance(last_session, datetime):
+                days_since = (now.date() - last_session.date()).days
+                if days_since == 1:
+                    # Consecutive day
+                    current_streak += 1
+                elif days_since > 1:
+                    # Streak broken
+                    current_streak = 1
+                # Same day - streak unchanged
+            else:
+                current_streak = 1
+        else:
+            current_streak = 1
+        
+        # Update effort metrics
+        await memory_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$inc": {"progress.effort_metrics.total_sessions": 1 if session_occurred else 0},
+                "$set": {
+                    "progress.effort_metrics.consistency_streak": current_streak,
+                    "progress.effort_metrics.last_session_date": now,
+                    "updated_at": now
+                }
+            }
+        )
+    
+    async def update_learner_traits(self, user_id: str):
+        """
+        Analyze evaluation history to update long-term learner traits.
+        Derives perseverance and frustration tolerance from patterns.
+        """
+        memory_collection = get_user_memory_collection()
+        memory = await memory_collection.find_one({"user_id": user_id})
+        
+        if not memory:
+            return
+        
+        eval_history = memory.get("progress", {}).get("evaluation_history", [])
+        effort = memory.get("progress", {}).get("effort_metrics", {})
+        
+        if len(eval_history) < 5:
+            return  # Need enough data
+        
+        # Calculate perseverance: high effort despite low clarity = high perseverance
+        total_sessions = effort.get("total_sessions", 0)
+        avg_clarity = sum(e.get("clarity_score", 50) for e in eval_history[-10:]) / min(10, len(eval_history))
+        
+        if total_sessions > 10 and avg_clarity < 40:
+            perseverance = "high"  # Lots of effort despite struggle
+        elif total_sessions > 5:
+            perseverance = "moderate"
+        else:
+            perseverance = "low"
+        
+        # Calculate frustration tolerance: how often do they continue after worsening trend?
+        worsening_count = sum(1 for e in eval_history if e.get("confusion_trend") == "worsening")
+        if worsening_count > 3 and total_sessions > worsening_count * 2:
+            frustration_tolerance = "high"  # Continues despite frustration
+        elif worsening_count > 2:
+            frustration_tolerance = "moderate"
+        else:
+            frustration_tolerance = "moderate"
+        
+        await memory_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "profile.perseverance": perseverance,
+                    "profile.frustration_tolerance": frustration_tolerance,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
