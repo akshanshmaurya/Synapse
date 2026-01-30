@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Leaf, Sprout, Home, MessageSquare, Map, User, Shield, Edit3, X, Plus, Check, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchUserMemory, updateUserProfile } from "@/services/api";
+import Logo from "@/components/Logo";
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
@@ -109,7 +110,7 @@ export default function ProfilePage() {
                 {/* Sidebar */}
                 <aside className="w-64 p-6 flex flex-col fixed h-screen">
                     <div className="flex items-center gap-3 mb-12">
-                        <img src="/logo.png" alt="Synapse" className="h-10" />
+                        <Logo size="md" />
                     </div>
 
                     <nav className="space-y-2 flex-1">

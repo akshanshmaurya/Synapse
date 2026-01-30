@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Leaf, Sprout, Sun, Droplets, Wind, Home, MessageSquare, Map, User, ChevronRight, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchDashboardData, DashboardData } from "@/services/api";
+import Logo from "@/components/Logo";
 
 export default function DashboardPage() {
     const { user, logout } = useAuth();
@@ -84,7 +85,7 @@ export default function DashboardPage() {
                 {/* Sidebar */}
                 <aside className="w-64 p-6 flex flex-col fixed h-screen">
                     <div className="flex items-center gap-3 mb-12">
-                        <img src="/logo.png" alt="Synapse" className="h-10" />
+                        <Logo size="md" />
                     </div>
 
                     <nav className="space-y-2 flex-1">
