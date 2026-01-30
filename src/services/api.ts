@@ -12,7 +12,12 @@ const getAuthHeaders = (): Record<string, string> => {
 };
 
 // Chat API
-export const sendMessage = async (message: string): Promise<string> => {
+export interface ChatResult {
+    response: string;
+    chatId: string | null;
+}
+
+export const sendMessage = async (message: string, chatId?: string): Promise<ChatResult> => {
     const token = localStorage.getItem('auth_token');
     const endpoint = token ? '/api/chat' : '/api/chat/guest';
 
@@ -22,7 +27,7 @@ export const sendMessage = async (message: string): Promise<string> => {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, chat_id: chatId }),
     });
 
     if (!response.ok) {
@@ -30,12 +35,95 @@ export const sendMessage = async (message: string): Promise<string> => {
     }
 
     const data = await response.json();
-    return data.response;
+    return {
+        response: data.response,
+        chatId: data.chat_id
+    };
 };
 
 // Legacy function for backward compatibility
 export const sendMessageWithUserId = async (userId: string, message: string): Promise<string> => {
-    return sendMessage(message);
+    const result = await sendMessage(message);
+    return result.response;
+};
+
+// Chat History API
+export interface ChatSession {
+    _id: string;
+    user_id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    last_message_preview: string | null;
+}
+
+export interface ChatMessage {
+    _id: string;
+    chat_id: string;
+    sender: 'user' | 'mentor';
+    content: string;
+    timestamp: string;
+}
+
+export const fetchChatSessions = async (limit: number = 20, offset: number = 0): Promise<ChatSession[]> => {
+    try {
+        const response = await fetch(`${API_URL}/api/chats?limit=${limit}&offset=${offset}`, {
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.chats;
+    } catch (error) {
+        console.error('Fetch Chat Sessions Error:', error);
+        return [];
+    }
+};
+
+export const fetchChatMessages = async (chatId: string, limit: number = 50): Promise<ChatMessage[]> => {
+    try {
+        const response = await fetch(`${API_URL}/api/chats/${chatId}/messages?limit=${limit}`, {
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.messages;
+    } catch (error) {
+        console.error('Fetch Chat Messages Error:', error);
+        return [];
+    }
+};
+
+export const createChatSession = async (title?: string): Promise<string | null> => {
+    try {
+        const response = await fetch(`${API_URL}/api/chats`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders(),
+            },
+            body: JSON.stringify({ title: title || 'New Conversation' }),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.chat_id;
+    } catch (error) {
+        console.error('Create Chat Session Error:', error);
+        return null;
+    }
+};
+
+export const deleteChatSession = async (chatId: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Delete Chat Session Error:', error);
+        return false;
+    }
 };
 
 // TTS API
