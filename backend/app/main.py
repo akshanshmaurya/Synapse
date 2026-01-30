@@ -175,6 +175,16 @@ async def get_user_memory(current_user: dict = Depends(get_current_user)):
     
     return {"memory": memory}
 
+@app.get("/api/user/dashboard")
+async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
+    """Get derived dashboard insights for the user"""
+    from app.services.dashboard_service import DashboardService
+    
+    user_id = str(current_user["_id"])
+    service = DashboardService()
+    
+    return await service.get_dashboard_insights(user_id)
+
 @app.put("/api/user/profile")
 async def update_user_profile(
     interests: list = None,
