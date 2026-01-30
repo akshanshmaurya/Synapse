@@ -44,15 +44,18 @@ class AgentOrchestrator:
         # Get or create chat session
         if not chat_id:
             chat_id = await chat_service.get_or_create_active_chat(user_id)
+            print(f"[DEBUG] Created/got chat_id: {chat_id}")
         
         try:
             # ========== STEP 1: SAVE USER MESSAGE IMMEDIATELY ==========
+            print(f"[DEBUG] Saving user message to chat {chat_id}")
             await chat_service.add_message(
                 chat_id=chat_id,
                 user_id=user_id,
                 sender=MessageSender.USER,
                 content=message
             )
+            print(f"[DEBUG] User message saved successfully")
             
             # ========== STEP 2: GET CONTEXT ==========
             user_context = await self.memory_agent.get_user_context(user_id)
@@ -62,6 +65,7 @@ class AgentOrchestrator:
             # Check message count to determine if this is first message
             msg_count = await chat_service.get_message_count(chat_id)
             is_first_message = msg_count <= 1
+            print(f"[DEBUG] Message count: {msg_count}, is_first: {is_first_message}")
             
             # ========== STEP 3: PLANNER (includes chat_intent) ==========
             strategy = self.planner_agent.plan_response(user_context, message)
@@ -70,6 +74,7 @@ class AgentOrchestrator:
             response = self.executor_agent.generate_response(user_context, message, strategy)
             
             # ========== STEP 5: SAVE MENTOR RESPONSE IMMEDIATELY ==========
+            print(f"[DEBUG] Saving mentor response to chat {chat_id}")
             await chat_service.add_message(
                 chat_id=chat_id,
                 user_id=user_id,
@@ -77,6 +82,7 @@ class AgentOrchestrator:
                 content=response,
                 metadata={"planner_strategy": strategy}
             )
+            print(f"[DEBUG] Mentor response saved successfully")
             
             # ========== STEP 6: UPDATE CHAT TITLE (first message only) ==========
             if is_first_message:
