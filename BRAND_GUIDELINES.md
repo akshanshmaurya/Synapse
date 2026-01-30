@@ -3,7 +3,7 @@
 ## Logo
 
 ### Wordmark: "Synapse"
-- **Font**: Playfair Display SC (small caps)
+- **Font**: Playfair Display (weight 500)
 - **Color**: Deep Olive `#5C6B4A`
 - **Feel**: Calm, human, intelligent
 
