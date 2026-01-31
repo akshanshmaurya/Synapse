@@ -129,7 +129,7 @@ export default function CognitiveTracePanel() {
                                 </>
                             )}
                             <span className="text-[10px] text-gray-400 ml-auto font-mono">
-                                {new Date(trace.timestamp).toLocaleTimeString()}
+                                {new Date(trace.timestamp).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
                         </div>
                         <div className="text-white mb-2 font-bold text-sm tracking-tight">{trace.action}</div>
