@@ -118,12 +118,12 @@ This document explains **HOW** each agent performs its assignment—the internal
 flowchart TD
     User -->|Message| Memory[Memory Agent]
     Memory -->|Context| Planner[Planner Agent]
-    Planner -->|Strategy JSON| Executor[Executor Agent]
+    Planner -->|"Strategy JSON"| Executor[Executor Agent]
     Executor -->|Text| User
     
     subgraph "The Jury (Async Background)"
         Executor -.->|Response| Evaluator[Evaluator Agent]
         User -.->|Message| Evaluator
-        Evaluator -->|Score & Traits| Memory
+        Evaluator -->|"Score & Traits"| Memory
     end
 ```
