@@ -185,7 +185,8 @@ class AgentOrchestrator:
             await trace_service.add_trace(request_id, "Evaluator", "Interaction Scored", {
                 "clarity_score": evaluation.get("clarity_score"),
                 "delta": evaluation.get("understanding_delta"),
-                "trend": evaluation.get("confusion_trend")
+                "trend": evaluation.get("confusion_trend"),
+                "reason": evaluation.get("reasoning")
             })
             
             # Update memory based on evaluation (insights only)
