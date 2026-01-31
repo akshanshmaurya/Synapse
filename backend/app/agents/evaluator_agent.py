@@ -42,21 +42,33 @@ STUDENT CONTEXT:
 - Previous clarity score: {prev_clarity}
 
 IMPORTANT: Evaluate UNDERSTANDING QUALITY, not just activity or effort.
-- clarity_score: How well does the student understand the material? (0-100)
-- confusion_trend: Is confusion improving, stable, or worsening?
-- understanding_delta: Change in understanding (-10 to +10)
-- stagnation_flags: Topics where NO progress is being made.
 
-CORE PHILOSOPHY:
-- Momentum comes from clarity improvement + independence, NOT just session count.
-- Output signals and scores, NOT narratives.
-- Be a strict judge of learning quality.
+CORE RULE (NON-NEGOTIABLE):
+Explicit expressions of confusion (e.g., "I don't get it", "I'm confused") must NEVER increase clarity score.
+- clarity_score must decrease or remain unchanged.
+- understanding_delta must be <= 0.
+- confusion_trend must be "stable" or "worsening".
+
+WHAT NOT TO USE AS PROGRESS SIGNALS:
+- User continuing to chat
+- User asking questions
+- Mentor giving a long explanation
+- Polite tone or effort
+- Number of sessions
+(Effort != Understanding)
+
+WHAT COUNTS AS POSITIVE UNDERSTANDING:
+- Paraphrasing the concept correctly
+- Applying concept to new example
+- Answering "why" or "how" correctly
+- Correcting a previous misconception
 
 OUTPUT AS JSON:
 {{
     "clarity_score": 0-100,
     "confusion_trend": "improving" or "stable" or "worsening",
     "understanding_delta": -10 to +10,
+    "reasoning": "Explicit reason for score change (e.g., 'User stated confusion')",
     "stagnation_flags": ["topic1", "topic2"] or [],
     "engagement_level": "high" or "medium" or "low",
     "struggle_detected": null or "topic that needs attention",
@@ -83,7 +95,40 @@ RESPOND ONLY WITH VALID JSON."""
             if text.endswith("```"):
                 text = text[:-3]
             
-            return json.loads(text.strip())
+            result = json.loads(text.strip())
+
+            # ---------------------------------------------------------
+            # FAIL-SAFE: STRICT LOGIC ENFORCEMENT
+            # Global Invariant: Explicit confusion MUST NOT increase clarity.
+            # ---------------------------------------------------------
+            explicit_confusion_markers = [
+                "don't get it", "dont get it", "don't understand", "dont understand",
+                "im confused", "i'm confused", "doesn't make sense", "doesnt make sense",
+                "still unclear", "lost", "what do you mean"
+            ]
+            
+            is_explicitly_confused = any(m in user_message.lower() for m in explicit_confusion_markers)
+            
+            if is_explicitly_confused:
+                # 1. Block Clarity Increase
+                if result.get("clarity_score", 0) > prev_clarity:
+                    result["clarity_score"] = prev_clarity
+                    result["reasoning"] = (result.get("reasoning", "") + " [FAILSAFE: Score capped due to explicit confusion]").strip()
+                
+                # 2. Enforce Non-Positive Delta
+                if result.get("understanding_delta", 0) > 0:
+                    result["understanding_delta"] = 0
+                
+                # 3. Block "Improving" Trend
+                if result.get("confusion_trend") == "improving":
+                    result["confusion_trend"] = "stable"
+                
+                # 4. Enforce Struggle Detection
+                if not result.get("struggle_detected"):
+                    result["struggle_detected"] = "explicit confusion"
+                    result["struggle_severity"] = "moderate"
+
+            return result
         except Exception as e:
             print(f"Evaluator error: {e}")
             return self._default_evaluation()
@@ -296,6 +341,7 @@ RESPOND ONLY WITH JSON."""
             "clarity_score": 50,
             "confusion_trend": "stable",
             "understanding_delta": 0,
+            "reasoning": "Default evaluation due to error",
             "stagnation_flags": [],
             "engagement_level": "medium",
             "struggle_detected": None,
