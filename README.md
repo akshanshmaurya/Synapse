@@ -99,10 +99,10 @@ flowchart LR
     EVAL --> |updates| MEM
     
     subgraph Logging["Cognitive Trace System"]
-        MEM -.-> |[DB WRITE]| LOG[Trace Logs]
-        PLAN -.-> |[STRATEGY]| LOG
-        EXEC -.-> |[RESPONSE]| LOG
-        EVAL -.-> |[SCORE]| LOG
+        MEM -.-> |"[DB WRITE]"| LOG[Trace Logs]
+        PLAN -.-> |"[STRATEGY]"| LOG
+        EXEC -.-> |"[RESPONSE]"| LOG
+        EVAL -.-> |"[SCORE]"| LOG
     end
     
     EXEC --> RESP[Mentor Response]

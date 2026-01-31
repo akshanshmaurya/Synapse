@@ -38,7 +38,11 @@ class TraceService:
         # formatting for frontend
         for t in traces:
             t["_id"] = str(t["_id"])
-            t["timestamp"] = t["timestamp"].isoformat()
+            # Ensure UTC "Z" suffix so frontend converts to local time correctly
+            ts = t["timestamp"].isoformat()
+            if not ts.endswith("Z"):
+                ts += "Z"
+            t["timestamp"] = ts
             
         return traces
 
