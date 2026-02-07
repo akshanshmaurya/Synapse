@@ -39,9 +39,9 @@ class ExecutorAgent:
         
         # Adjust max lines based on verbosity
         if verbosity == "brief":
-            max_lines = 4
-        elif verbosity == "detailed":
             max_lines = 8
+        elif verbosity == "detailed":
+            max_lines = 12
         
         prompt = f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
 
