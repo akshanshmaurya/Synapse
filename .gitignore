@@ -1,0 +1,71 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables - CRITICAL: Never commit these!
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+backend/.env
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+eggs/
+*.egg-info/
+*.egg
+
+# IDE specific
+.idea/
+*.iml
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Secrets and credentials
+*.pem
+*.key
+secrets/
+credentials/
+node_modules/
+*.pyc
+*.coverage
+.pytest_cache/
+.ruff_cache/
+user_data.json
+dist/
