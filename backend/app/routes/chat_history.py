@@ -5,7 +5,7 @@ Endpoints for managing chat sessions and retrieving message history.
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.services.chat_service import chat_service
@@ -14,11 +14,11 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 
 
 class CreateChatRequest(BaseModel):
-    title: Optional[str] = "New Conversation"
+    title: Optional[str] = Field("New Conversation", max_length=200)
 
 
 class UpdateChatRequest(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
 
 
 # --- Chat Session Endpoints ---

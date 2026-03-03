@@ -133,8 +133,6 @@ class AgentOrchestrator:
             
         except Exception as e:
             logger.error("Orchestrator error: %s", e, exc_info=True)
-            import traceback
-            traceback.print_exc()
             return {
                 "response": "I sense something stirred in our conversation. Let's pause for a moment — share with me what you were thinking, and we'll find our way together.",
                 "chat_id": chat_id
