@@ -134,12 +134,12 @@ class RoadmapFeedback(BaseModel):
 
 class RoadmapGenerateRequest(BaseModel):
     """Request to generate a new roadmap"""
-    goal: str
-    context: Optional[str] = None
+    goal: str = Field(..., min_length=1, max_length=1000)
+    context: Optional[str] = Field(None, max_length=2000)
     preferred_pace: Optional[str] = None  # slow, moderate, fast
 
 class StepFeedbackRequest(BaseModel):
     """Request to mark a step with feedback"""
     step_id: str
     feedback_type: StepStatus
-    message: Optional[str] = None
+    message: Optional[str] = Field(None, max_length=2000)

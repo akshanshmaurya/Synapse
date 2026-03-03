@@ -3,8 +3,8 @@ Onboarding API Routes
 Handles new user onboarding flow
 """
 from fastapi import APIRouter, HTTPException, status, Depends
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from datetime import datetime
 
 from app.auth.dependencies import get_current_user
@@ -13,11 +13,11 @@ from app.db.mongodb import get_user_memory_collection
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 class OnboardingData(BaseModel):
-    """Onboarding form data"""
-    why_here: str
-    guidance_type: str
-    experience_level: str
-    mentoring_style: str
+    """Onboarding form data — validated with Literal types"""
+    why_here: str = Field(..., min_length=1, max_length=2000)
+    guidance_type: Literal["career", "skills", "goals", "confidence", "balance"]
+    experience_level: Literal["beginner", "intermediate", "advanced"]
+    mentoring_style: Literal["gentle", "supportive", "direct", "challenging"]
 
 class OnboardingStatus(BaseModel):
     """Response for onboarding status"""

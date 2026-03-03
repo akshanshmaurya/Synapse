@@ -1,53 +1,48 @@
 /**
  * API Service
- * Handles all backend API calls with authentication
+ * Handles all backend API calls with cookie-based authentication.
+ * All requests include credentials: 'include' for HttpOnly cookie auth.
  */
 
 const API_URL = 'http://localhost:8000';
 
-// Helper to get auth headers
-const getAuthHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem('auth_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 // Chat API
-export interface ChatResult {
+
+interface ChatResult {
     response: string;
     chatId: string | null;
 }
 
-export const sendMessage = async (message: string, chatId?: string): Promise<ChatResult> => {
-    const token = localStorage.getItem('auth_token');
-    const endpoint = token ? '/api/chat' : '/api/chat/guest';
+export async function sendMessage(message: string, chatId?: string): Promise<ChatResult> {
+    const body: any = { message };
+    if (chatId) body.chat_id = chatId;
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ message, chat_id: chatId }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error(`Chat failed: ${response.status}`);
     }
 
     const data = await response.json();
     return {
         response: data.response,
-        chatId: data.chat_id
+        chatId: data.chat_id || null,
     };
-};
+}
 
 // Legacy function for backward compatibility
-export const sendMessageWithUserId = async (userId: string, message: string): Promise<string> => {
+export async function sendMessageWithUserId(userId: string, message: string): Promise<string> {
     const result = await sendMessage(message);
     return result.response;
-};
+}
 
 // Chat History API
+
 export interface ChatSession {
     _id: string;
     user_id: string;
@@ -66,139 +61,135 @@ export interface ChatMessage {
     timestamp: string;
 }
 
-export const fetchChatSessions = async (limit: number = 20, offset: number = 0): Promise<ChatSession[]> => {
-    try {
-        const response = await fetch(`${API_URL}/api/chats?limit=${limit}&offset=${offset}`, {
-            headers: getAuthHeaders(),
-        });
-        if (!response.ok) return [];
-        const data = await response.json();
-        return data.chats;
-    } catch (error) {
-        console.error('Fetch Chat Sessions Error:', error);
+export async function fetchChatSessions(limit: number = 20, offset: number = 0): Promise<ChatSession[]> {
+    const response = await fetch(
+        `${API_URL}/api/chats?limit=${limit}&offset=${offset}`,
+        { credentials: 'include' },
+    );
+
+    if (!response.ok) {
+        console.error('Failed to fetch chat sessions:', response.status);
         return [];
     }
-};
 
-export const fetchChatMessages = async (chatId: string, limit: number = 50): Promise<ChatMessage[]> => {
-    try {
-        const response = await fetch(`${API_URL}/api/chats/${chatId}/messages?limit=${limit}`, {
-            headers: getAuthHeaders(),
-        });
-        if (!response.ok) return [];
-        const data = await response.json();
-        return data.messages;
-    } catch (error) {
-        console.error('Fetch Chat Messages Error:', error);
+    const data = await response.json();
+    return data.chats || [];
+}
+
+export async function fetchChatMessages(chatId: string, limit: number = 50): Promise<ChatMessage[]> {
+    const response = await fetch(
+        `${API_URL}/api/chats/${chatId}/messages?limit=${limit}`,
+        { credentials: 'include' },
+    );
+
+    if (!response.ok) {
+        console.error('Failed to fetch messages:', response.status);
         return [];
     }
-};
 
-export const createChatSession = async (title?: string): Promise<string | null> => {
+    const data = await response.json();
+    return data.messages || [];
+}
+
+export async function createChatSession(title?: string): Promise<string | null> {
     try {
         const response = await fetch(`${API_URL}/api/chats`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders(),
-            },
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ title: title || 'New Conversation' }),
         });
+
         if (!response.ok) return null;
+
         const data = await response.json();
         return data.chat_id;
     } catch (error) {
-        console.error('Create Chat Session Error:', error);
+        console.error('Failed to create chat session:', error);
         return null;
     }
-};
+}
 
-export const deleteChatSession = async (chatId: string): Promise<boolean> => {
+export async function deleteChatSession(chatId: string): Promise<boolean> {
     try {
         const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         return response.ok;
-    } catch (error) {
-        console.error('Delete Chat Session Error:', error);
+    } catch {
         return false;
     }
-};
+}
 
 // TTS API
-export const streamAudio = async (text: string): Promise<HTMLAudioElement | null> => {
+export async function streamAudio(text: string): Promise<HTMLAudioElement | null> {
     try {
         const response = await fetch(`${API_URL}/api/tts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ text }),
         });
 
         if (!response.ok) return null;
 
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        return new Audio(url);
-    } catch (error) {
-        console.error('TTS Error:', error);
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        return new Audio(audioUrl);
+    } catch {
         return null;
     }
-};
+}
 
 // User API
-export const fetchUserState = async (): Promise<any> => {
+export async function fetchUserState(): Promise<any> {
     try {
         const response = await fetch(`${API_URL}/api/user/me`, {
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) return null;
         return await response.json();
-    } catch (error) {
-        console.error('Fetch User Error:', error);
+    } catch {
         return null;
     }
-};
+}
 
-export const fetchUserMemory = async (): Promise<any> => {
+export async function fetchUserMemory(): Promise<any> {
     try {
         const response = await fetch(`${API_URL}/api/user/memory`, {
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) return null;
-        const data = await response.json();
-        return data.memory;
-    } catch (error) {
-        console.error('Fetch Memory Error:', error);
+        return await response.json();
+    } catch {
         return null;
     }
-};
+}
 
 // Dashboard Data Types
+
 export interface DashboardData {
     momentum: {
         state: "starting" | "building" | "steady" | "accelerating" | "struggling";
         insight: string;
         metrics: {
-            clarity_score: number;  // 0-100: understanding quality
-            understanding_trend: "improving" | "stable" | "worsening";
-            understanding_delta: number;  // -10 to +10
-            evaluation_count: number;
+            clarity_score: number;
+            confusion_trend: string;
+            understanding_delta: number;
         };
     };
-    effort: {  // NEW: Separate effort section
-        sessions_this_week: number;
+    effort: {
         total_sessions: number;
         consistency_streak: number;
-        persistence_label: string;
-        note: string;
+        persistence_score: number;
+        label: string;
     };
     next_bloom: {
         title: string;
         description: string;
-        source: "roadmap" | "inferred";
-        action_hint?: string;
-    } | null;
+        source: string;
+    };
     recent_signals: {
         observation: string;
         timestamp: string;
@@ -209,104 +200,100 @@ export interface DashboardData {
     daily_nurture_prompt: string | null;
 }
 
-
-export const fetchDashboardData = async (): Promise<DashboardData | null> => {
+export async function fetchDashboardData(): Promise<DashboardData | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/dashboard`, {
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) return null;
         return await response.json();
-    } catch (error) {
-        console.error('Fetch Dashboard Error:', error);
+    } catch {
         return null;
     }
-};
+}
 
-export const updateUserProfile = async (interests?: string[], goals?: string[]): Promise<boolean> => {
+export async function updateUserProfile(interests?: string[], goals?: string[]): Promise<boolean> {
     try {
         const params = new URLSearchParams();
-        if (interests) params.append('interests', JSON.stringify(interests));
-        if (goals) params.append('goals', JSON.stringify(goals));
+        if (interests) interests.forEach((i) => params.append('interests', i));
+        if (goals) goals.forEach((g) => params.append('goals', g));
 
         const response = await fetch(`${API_URL}/api/user/profile?${params}`, {
             method: 'PUT',
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         return response.ok;
-    } catch (error) {
-        console.error('Update Profile Error:', error);
+    } catch {
         return false;
     }
-};
+}
 
 // Roadmap API
-export const fetchRoadmap = async (): Promise<any> => {
+export async function fetchRoadmap(): Promise<any> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/current`, {
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) return null;
-        const data = await response.json();
-        return data.roadmap;
-    } catch (error) {
-        console.error('Fetch Roadmap Error:', error);
+        return await response.json();
+    } catch {
         return null;
     }
-};
+}
 
-export const generateRoadmap = async (goal: string, context?: string): Promise<any> => {
+export async function generateRoadmap(goal: string, context?: string): Promise<any> {
     try {
+        const body: any = { goal };
+        if (context) body.context = context;
+
         const response = await fetch(`${API_URL}/api/roadmap/generate`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders(),
-            },
-            body: JSON.stringify({ goal, context }),
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
         });
+
         if (!response.ok) return null;
-        const data = await response.json();
-        return data.roadmap;
-    } catch (error) {
-        console.error('Generate Roadmap Error:', error);
+        return await response.json();
+    } catch {
         return null;
     }
-};
+}
 
-export const submitRoadmapFeedback = async (
+export async function submitRoadmapFeedback(
     roadmapId: string,
     stepId: string,
     feedbackType: string,
-    message?: string
-): Promise<boolean> => {
+    message?: string,
+): Promise<boolean> {
     try {
-        const response = await fetch(`${API_URL}/api/roadmap/feedback?roadmap_id=${roadmapId}`, {
+        const body: any = {
+            step_id: stepId,
+            feedback_type: feedbackType,
+        };
+        if (message) body.message = message;
+
+        const response = await fetch(`${API_URL}/api/roadmap/feedback/${roadmapId}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders(),
-            },
-            body: JSON.stringify({ step_id: stepId, feedback_type: feedbackType, message }),
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
         });
         return response.ok;
-    } catch (error) {
-        console.error('Submit Feedback Error:', error);
+    } catch {
         return false;
     }
-};
+}
 
-export const regenerateRoadmap = async (roadmapId: string): Promise<any> => {
+export async function regenerateRoadmap(roadmapId: string): Promise<any> {
     try {
-        const response = await fetch(`${API_URL}/api/roadmap/regenerate?roadmap_id=${roadmapId}`, {
+        const response = await fetch(`${API_URL}/api/roadmap/regenerate/${roadmapId}`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) return null;
-        const data = await response.json();
-        return data.roadmap;
-    } catch (error) {
-        console.error('Regenerate Roadmap Error:', error);
+        return await response.json();
+    } catch {
         return null;
     }
-};
+}
