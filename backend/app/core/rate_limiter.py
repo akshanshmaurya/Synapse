@@ -2,6 +2,13 @@
 Rate Limiter
 Lightweight in-memory rate limiter using sliding window counters.
 Compatible with Python 3.14+ (no pkg_resources dependency).
+
+SCALABILITY NOTE: 
+This current implementation is in-memory and per-process. 
+In a scaled deployment with multiple Uvicorn workers or distributed pods, 
+this should be replaced with a Redis-backed store (e.g., using `redis-py` 
+or a dedicated library like `limits`) to ensure global rate-limit enforcement.
+The `rate_limit` dependency API can remain unchanged while swapping the backend.
 """
 import time
 from collections import defaultdict

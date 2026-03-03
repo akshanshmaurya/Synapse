@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     # --- Authentication ---
     JWT_SECRET: str  # No default — must be set in .env
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
 
     # --- AI / LLM ---
     GEMINI_API_KEY: str  # No default — must be set in .env

@@ -11,10 +11,11 @@ Production-grade hardening:
 - Structured logging
 - Health check endpoint
 """
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 
@@ -31,8 +32,7 @@ from app.utils.logger import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        MongoDB.connect()
-        logger.info("MongoDB connected successfully")
+        await MongoDB.connect()
     except Exception as e:
         logger.error("MongoDB connection failed: %s", e, exc_info=True)
     yield
@@ -42,13 +42,37 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Synapse API", lifespan=lifespan)
 
 
-# --- Global Exception Handler ---
+# --- Global Exception Handlers ---
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"error": True, "code": "INTERNAL_ERROR", "message": "Internal server error"},
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # Standardize HTTP exceptions
+    # Some built-in fastAPI exceptions don't have code, so we derive one from status
+    code_map = {
+        status.HTTP_400_BAD_REQUEST: "BAD_REQUEST",
+        status.HTTP_401_UNAUTHORIZED: "UNAUTHORIZED",
+        status.HTTP_403_FORBIDDEN: "FORBIDDEN",
+        status.HTTP_404_NOT_FOUND: "NOT_FOUND",
+        status.HTTP_429_TOO_MANY_REQUESTS: "RATE_LIMIT_EXCEEDED",
+    }
+    code = code_map.get(exc.status_code, "ERROR")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": True, "code": code, "message": exc.detail},
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"error": True, "code": "VALIDATION_ERROR", "message": str(exc.errors())},
     )
 
 # --- Middleware ---
