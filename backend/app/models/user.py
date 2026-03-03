@@ -2,9 +2,10 @@
 User Model for MongoDB
 """
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 from bson import ObjectId
+
 
 class PyObjectId(str):
     """Custom type for MongoDB ObjectId"""
@@ -20,16 +21,19 @@ class PyObjectId(str):
             return v
         raise ValueError("Invalid ObjectId")
 
+
 class UserCreate(BaseModel):
     """User creation request"""
     email: EmailStr
-    password: str
-    name: Optional[str] = None
+    password: str = Field(..., min_length=8, max_length=128)
+    name: Optional[str] = Field(None, max_length=100)
+
 
 class UserLogin(BaseModel):
     """User login request"""
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
+
 
 class UserInDB(BaseModel):
     """User document in MongoDB"""
@@ -37,11 +41,13 @@ class UserInDB(BaseModel):
     email: str
     password_hash: str
     name: Optional[str] = None
+    role: str = "user"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
-    
+
     class Config:
         populate_by_name = True
+
 
 class UserResponse(BaseModel):
     """User response (safe, no password)"""
@@ -50,8 +56,7 @@ class UserResponse(BaseModel):
     name: Optional[str] = None
     created_at: datetime
 
-class TokenResponse(BaseModel):
-    """JWT token response"""
-    access_token: str
-    token_type: str = "bearer"
+
+class AuthResponse(BaseModel):
+    """Auth response — token is set via HttpOnly cookie, NOT in this body"""
     user: UserResponse

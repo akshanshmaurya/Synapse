@@ -17,6 +17,7 @@ from app.agents.evaluator_agent import EvaluatorAgent
 from app.services.chat_service import chat_service
 from app.services.trace_service import trace_service
 from app.models.chat import MessageSender
+from app.utils.logger import logger
 
 
 class AgentOrchestrator:
@@ -131,7 +132,7 @@ class AgentOrchestrator:
             return result
             
         except Exception as e:
-            print(f"Orchestrator error: {e}")
+            logger.error("Orchestrator error: %s", e, exc_info=True)
             import traceback
             traceback.print_exc()
             return {
@@ -207,7 +208,7 @@ class AgentOrchestrator:
                 await self.memory_agent.update_learner_traits(user_id)
                 
         except Exception as e:
-            print(f"Background task error (non-critical): {e}")
+            logger.warning("Background task error (non-critical): %s", e)
     
     def _generate_chat_title(self, first_message: str, chat_intent: str) -> str:
         """

@@ -4,12 +4,13 @@ Analyzes interactions to detect struggles and update strategy effectiveness.
 Updates memory with insights including learning pace - no user-facing output.
 """
 import google.generativeai as genai
-import os
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
+from app.core.config import settings
+from app.utils.logger import logger
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class EvaluatorAgent:
     def __init__(self):
@@ -130,7 +131,7 @@ RESPOND ONLY WITH VALID JSON."""
 
             return result
         except Exception as e:
-            print(f"Evaluator error: {e}")
+            logger.error("Evaluator error: %s", e)
             return self._default_evaluation()
     
     def analyze_roadmap_feedback(
@@ -200,7 +201,7 @@ RESPOND ONLY WITH JSON."""
             
             return json.loads(text.strip())
         except Exception as e:
-            print(f"Roadmap feedback analysis error: {e}")
+            logger.error("Roadmap feedback analysis error: %s", e)
             return {
                 "action": "regenerate" if stuck_count > 1 else "none",
                 "new_learning_pace": "slow" if stuck_count > 2 else None,

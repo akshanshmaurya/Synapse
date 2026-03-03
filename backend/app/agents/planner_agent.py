@@ -4,11 +4,12 @@ Decides guidance strategy based on user context.
 Outputs structured JSON decisions - no natural language.
 """
 import google.generativeai as genai
-import os
 import json
 from typing import Dict, Any, Optional
+from app.core.config import settings
+from app.utils.logger import logger
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class PlannerAgent:
     def __init__(self):
@@ -95,10 +96,10 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
             
             return json.loads(text.strip())
         except json.JSONDecodeError as e:
-            print(f"Planner JSON error: {e}")
+            logger.warning("Planner JSON error: %s", e)
             return self._default_strategy()
         except Exception as e:
-            print(f"Planner Agent error: {e}")
+            logger.error("Planner Agent error: %s", e)
             return self._default_strategy()
     
     def plan_roadmap_adjustment(
@@ -153,7 +154,7 @@ RESPOND ONLY WITH VALID JSON."""
             
             return json.loads(text.strip())
         except Exception as e:
-            print(f"Planner roadmap error: {e}")
+            logger.error("Planner roadmap error: %s", e)
             return {
                 "action": "simplify",
                 "reasoning": "Providing gentler steps based on feedback",

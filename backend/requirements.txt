@@ -22,5 +22,9 @@ requests>=2.31.0
 
 # Environment
 python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
+
+# Rate Limiting
+slowapi>=0.1.9
 
 # Utilities (BSON is included with pymongo)
