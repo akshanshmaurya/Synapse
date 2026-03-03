@@ -35,6 +35,12 @@ class UserLogin(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
 
 
+class UserChangePassword(BaseModel):
+    """User change password request"""
+    old_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
 class UserInDB(BaseModel):
     """User document in MongoDB"""
     id: Optional[str] = Field(None, alias="_id")
@@ -44,6 +50,8 @@ class UserInDB(BaseModel):
     role: str = "user"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
+    failed_attempts: int = 0
+    lock_until: Optional[datetime] = None
 
     class Config:
         populate_by_name = True
