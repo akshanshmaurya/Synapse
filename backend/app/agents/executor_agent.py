@@ -10,12 +10,13 @@ CONSTRAINTS:
 - No filler language, be concise
 """
 import google.generativeai as genai
-import os
 import json
 import uuid
 from typing import Dict, Any, Optional, List
+from app.core.config import settings
+from app.utils.logger import logger
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
 class ExecutorAgent:
@@ -74,7 +75,7 @@ Respond now (max {max_lines} lines):"""
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
-            print(f"Executor response error: {e}")
+            logger.error("Executor response error: %s", e)
             return "I'm with you. Tell me more about what's on your mind."
     
     def generate_voice_response(
@@ -106,7 +107,7 @@ Voice response:"""
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
-            print(f"Executor voice error: {e}")
+            logger.error("Executor voice error: %s", e)
             return "I hear you. Let's explore that together."
     
     async def generate_roadmap(
@@ -232,7 +233,7 @@ RESPOND ONLY WITH VALID JSON."""
             
             return roadmap
         except Exception as e:
-            print(f"Executor roadmap error: {e}")
+            logger.error("Executor roadmap error: %s", e)
             return None
     
     async def regenerate_roadmap(
@@ -332,5 +333,5 @@ RESPOND ONLY WITH VALID JSON."""
             
             return roadmap
         except Exception as e:
-            print(f"Executor regenerate error: {e}")
+            logger.error("Executor regenerate error: %s", e)
             return None

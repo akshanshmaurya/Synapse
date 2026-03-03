@@ -2,9 +2,10 @@
 MongoDB Connection Module
 Uses Motor for async MongoDB operations
 """
-import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
+from app.core.config import settings
+from app.utils.logger import logger
 
 class MongoDB:
     client: Optional[AsyncIOMotorClient] = None
@@ -13,19 +14,16 @@ class MongoDB:
     @classmethod
     def connect(cls):
         """Connect to MongoDB"""
-        mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-        db_name = os.getenv("MONGODB_DB", "gentle_guide")
-        
-        cls.client = AsyncIOMotorClient(mongo_url)
-        cls.db = cls.client[db_name]
-        print(f"Connected to MongoDB: {db_name}")
+        cls.client = AsyncIOMotorClient(settings.MONGO_URI)
+        cls.db = cls.client[settings.MONGODB_DB]
+        logger.info("MongoDB connected: %s", settings.MONGODB_DB)
 
     @classmethod
     def close(cls):
         """Close MongoDB connection"""
         if cls.client:
             cls.client.close()
-            print("MongoDB connection closed")
+            logger.info("MongoDB connection closed")
 
     @classmethod
     def get_db(cls):
