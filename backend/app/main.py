@@ -13,6 +13,7 @@ Production-grade hardening:
 """
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
@@ -50,12 +51,15 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"},
     )
 
-
 # --- Middleware ---
-# Security headers
+# NOTE: Starlette applies middleware in REVERSE order of add_middleware() calls.
+# The LAST middleware added is the OUTERMOST (runs first on request).
+
+# Security headers (runs third)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS — restricted to configured origins (no wildcard)
+
+# CORS (runs second)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -64,6 +68,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
 
 
 # --- Register Routes ---
