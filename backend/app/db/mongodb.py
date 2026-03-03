@@ -2,6 +2,8 @@
 MongoDB Connection Module
 Uses Motor for async MongoDB operations
 """
+import asyncio
+import sys
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 from app.core.config import settings
@@ -12,11 +14,35 @@ class MongoDB:
     db = None
 
     @classmethod
-    def connect(cls):
-        """Connect to MongoDB"""
-        cls.client = AsyncIOMotorClient(settings.MONGO_URI)
-        cls.db = cls.client[settings.MONGODB_DB]
-        logger.info("MongoDB connected: %s", settings.MONGODB_DB)
+    async def connect(cls):
+        """Connect to MongoDB with resilience"""
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"MongoDB connection attempt {attempt}/{max_retries}")
+                cls.client = AsyncIOMotorClient(
+                    settings.MONGO_URI,
+                    serverSelectionTimeoutMS=5000,
+                    connectTimeoutMS=10000,
+                )
+                # Verify connection
+                await cls.client.admin.command('ping')
+                cls.db = cls.client[settings.MONGODB_DB]
+                logger.info("MongoDB connected successfully: %s", settings.MONGODB_DB)
+                
+                # Create indexes asynchronously upon successful connection
+                await cls.create_all_indexes()
+                return
+            except Exception as e:
+                logger.error(f"MongoDB connection failed: {e}")
+                if attempt < max_retries:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.critical("Could not connect to MongoDB after multiple attempts. Exiting.")
+                    sys.exit(1)
 
     @classmethod
     def close(cls):
@@ -27,10 +53,45 @@ class MongoDB:
 
     @classmethod
     def get_db(cls):
-        """Get database instance"""
+        """Get database instance. Note: connect() must be explicitly called first in async context."""
         if cls.db is None:
-            cls.connect()
+            logger.warning("get_db called before connection established. This may cause errors if not handled.")
         return cls.db
+
+    @classmethod
+    async def create_all_indexes(cls):
+        """Create all necessary indexes for collections"""
+        if cls.db is None:
+            return
+
+        try:
+            # Users
+            users = cls.db["users"]
+            await users.create_index("email", unique=True)
+            await users.create_index("role")
+
+            # Sessions (Refresh Tokens)
+            sessions = cls.db["sessions"]
+            await sessions.create_index("user_id")
+            # TTL index to automatically delete expired sessions
+            await sessions.create_index("expires_at", expireAfterSeconds=0)
+
+            # Chats
+            chats = cls.db["chats"]
+            await chats.create_index([("user_id", 1), ("updated_at", -1)])
+            
+            # Messages
+            messages = cls.db["messages"]
+            await messages.create_index([("chat_id", 1), ("timestamp", -1)])
+            await messages.create_index("user_id")
+
+            # Roadmaps
+            roadmaps = cls.db["roadmaps"]
+            await roadmaps.create_index("user_id")
+
+            logger.info("Database indexes successfully verified/created.")
+        except Exception as e:
+            logger.error("Failed to create database indexes: %s", e)
 
 def get_database():
     return MongoDB.get_db()
@@ -66,16 +127,3 @@ def get_chats_collection():
 def get_messages_collection():
     """Collection for individual chat messages"""
     return MongoDB.get_db()["messages"]
-
-async def create_chat_indexes():
-    """Create indexes for efficient chat queries"""
-    messages = get_messages_collection()
-    chats = get_chats_collection()
-    
-    # Compound index for fetching messages by chat, ordered by time
-    await messages.create_index([("chat_id", 1), ("timestamp", -1)])
-    # Index for user's messages
-    await messages.create_index("user_id")
-    # Index for user's chat sessions
-    await chats.create_index([("user_id", 1), ("updated_at", -1)])
-
