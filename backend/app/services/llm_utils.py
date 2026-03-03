@@ -2,6 +2,7 @@ import time
 import random
 from google import genai
 from google.genai import types
+from app.utils.logger import logger
 
 def generate_with_retry(client, model, contents, config=None, retries=3, initial_delay=2):
     """
@@ -22,10 +23,10 @@ def generate_with_retry(client, model, contents, config=None, retries=3, initial
             error_str = str(e)
             if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
                 if attempt == retries - 1:
-                    print(f"FAILED after {retries} attempts. Max quota reached.")
+                    logger.error("LLM failed after %d attempts. Max quota reached.", retries)
                     raise e
                 
-                print(f"Rate limited (429). Retrying in {delay}s...")
+                logger.warning("Rate limited (429). Retrying in %ds...", delay)
                 time.sleep(delay + random.uniform(0, 1)) # Add jitter
                 delay *= 2 # Exponential backoff
             else:

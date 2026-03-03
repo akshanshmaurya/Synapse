@@ -4,15 +4,16 @@ Stores and retrieves user profile, struggles, and progress.
 No user-facing output - writes to MongoDB.
 """
 import google.generativeai as genai
-import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from bson import ObjectId
 
 from app.db.mongodb import get_user_memory_collection, get_interactions_collection
 from app.models.memory import UserMemory, Struggle, UserProfile, UserProgress
+from app.core.config import settings
+from app.utils.logger import logger
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class MemoryAgent:
     def __init__(self):
@@ -152,7 +153,7 @@ Write a warm, person-focused summary (not a list). Start with their stage of gro
             
             return summary
         except Exception as e:
-            print(f"Memory Agent error: {e}")
+            logger.error("Memory Agent error: %s", e)
             return ""
     
     async def store_evaluation_result(self, user_id: str, evaluation: Dict[str, Any]):

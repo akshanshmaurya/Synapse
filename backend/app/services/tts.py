@@ -1,5 +1,6 @@
-import os
 import requests
+from app.core.config import settings
+from app.utils.logger import logger
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 # Use a default voice ID (e.g., "Rachel" or a calm mentor voice)
@@ -8,9 +9,9 @@ ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 VOICE_ID = "21m00Tcm4TlvDq8ikWAM" 
 
 def generate_audio(text: str) -> bytes:
-    api_key = os.getenv("ELEVENLABS_API_KEY")
+    api_key = settings.ELEVENLABS_API_KEY
     if not api_key:
-        print("Warning: ELEVENLABS_API_KEY not set")
+        logger.warning("ELEVENLABS_API_KEY not set")
         return None
 
     headers = {
@@ -35,8 +36,8 @@ def generate_audio(text: str) -> bytes:
         if response.status_code == 200:
             return response.content
         else:
-            print(f"ElevenLabs Error: {response.status_code} - {response.text}")
+            logger.error("ElevenLabs error: %s - %s", response.status_code, response.text)
             return None
     except Exception as e:
-        print(f"TTS Exception: {e}")
+        logger.error("TTS exception: %s", e)
         return None

@@ -1,19 +1,36 @@
+"""
+Structured Logging System
+Replaces all print-based debugging with Python's logging module.
+Container-friendly: outputs to stdout with structured format.
+"""
 import logging
-import os
+import sys
 
-log_file = os.path.join(os.path.dirname(__file__), "debug.log")
-logging.basicConfig(
-    filename=log_file,
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
-def log_debug(message):
-    print(f"DEBUG: {message}")
-    logging.debug(message)
+def setup_logging(level: str = "INFO") -> logging.Logger:
+    """Configure the application-wide logger."""
+    logger = logging.getLogger("synapse")
 
-def log_error(message, error=None):
-    print(f"ERROR: {message}")
-    if error:
-        print(f"Traceback: {error}")
-    logging.error(f"{message} - {error}")
+    if logger.handlers:
+        return logger
+
+    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-7s | %(name)s.%(module)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    # Prevent propagation to root logger (avoids duplicate logs)
+    logger.propagate = False
+
+    return logger
+
+
+# Initialize on import
+logger = setup_logging()
