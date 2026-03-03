@@ -16,7 +16,7 @@ interface OnboardingQuestion {
 }
 
 export default function OnboardingPage() {
-    const { token, isAuthenticated, logout, completeOnboarding } = useAuth();
+    const { isAuthenticated, logout, completeOnboarding } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +81,7 @@ export default function OnboardingPage() {
         // Only check once after token loads
         if (hasChecked) return;
 
-        if (!token) {
+        if (!isAuthenticated) {
             // Wait for auth to load
             return;
         }
@@ -92,7 +92,7 @@ export default function OnboardingPage() {
         const checkStatus = async () => {
             try {
                 const response = await fetch(`${API_URL}/api/onboarding/status`, {
-                    headers: { Authorization: `Bearer ${token}` },
+                    credentials: 'include',
                 });
                 const data = await response.json();
                 if (data.is_complete) {
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
         };
 
         checkStatus();
-    }, [token, hasChecked, navigate]);
+    }, [isAuthenticated, hasChecked, navigate]);
 
     const handleAnswer = (value: string) => {
         const currentQuestion = questions[step];
@@ -140,8 +140,8 @@ export default function OnboardingPage() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
                 },
+                credentials: 'include',
                 body: JSON.stringify(answers),
             });
 

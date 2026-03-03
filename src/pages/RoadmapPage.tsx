@@ -28,7 +28,7 @@ interface Roadmap {
 }
 
 export default function RoadmapPage() {
-    const { token, isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, logout } = useAuth();
     const navigate = useNavigate();
     const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +58,7 @@ export default function RoadmapPage() {
     const fetchRoadmap = async () => {
         try {
             const response = await fetch(`${API_URL}/api/roadmap/current`, {
-                headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
             const data = await response.json();
             setRoadmap(data.roadmap);
@@ -80,8 +80,8 @@ export default function RoadmapPage() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
                 },
+                credentials: 'include',
                 body: JSON.stringify({ goal }),
             });
             const data = await response.json();
@@ -103,8 +103,8 @@ export default function RoadmapPage() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
                 },
+                credentials: 'include',
                 body: JSON.stringify({ step_id: stepId, feedback_type: feedbackType }),
             });
 
@@ -135,7 +135,7 @@ export default function RoadmapPage() {
         try {
             const response = await fetch(`${API_URL}/api/roadmap/regenerate?roadmap_id=${roadmap._id}`, {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
             const data = await response.json();
             setRoadmap(data.roadmap);

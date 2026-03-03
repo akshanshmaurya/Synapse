@@ -10,13 +10,12 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   onboardingComplete: boolean;
   login: (email: string, password: string) => Promise<{ needsOnboarding: boolean }>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkOnboarding: () => Promise<boolean>;
   completeOnboarding: () => void;
 }
@@ -27,33 +26,34 @@ const API_URL = 'http://localhost:8000';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
-  // Check for existing token on mount
+  // Check for existing session on mount (cookie is sent automatically)
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
+    if (storedUser) {
       setUser(JSON.parse(storedUser));
-      // Check onboarding status
-      checkOnboardingWithToken(storedToken);
+      // Check onboarding status using cookie auth
+      checkOnboardingOnMount();
     } else {
       setIsLoading(false);
     }
   }, []);
 
-  const checkOnboardingWithToken = async (authToken: string) => {
+  const checkOnboardingOnMount = async () => {
     try {
       const response = await fetch(`${API_URL}/api/onboarding/status`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
         setOnboardingComplete(data.is_complete);
+      } else if (response.status === 401) {
+        // Cookie expired/invalid — clear local user data
+        localStorage.removeItem('auth_user');
+        setUser(null);
       }
     } catch (error) {
       console.error('Failed to check onboarding:', error);
@@ -63,10 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkOnboarding = async (): Promise<boolean> => {
-    if (!token) return false;
     try {
       const response = await fetch(`${API_URL}/api/onboarding/status`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -83,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
 
@@ -93,36 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await response.json();
 
-    setToken(data.access_token);
     setUser(data.user);
-    localStorage.setItem('auth_token', data.access_token);
     localStorage.setItem('auth_user', JSON.stringify(data.user));
 
     // Check onboarding status
-    const isComplete = await checkOnboardingWithTokenAndReturn(data.access_token);
+    const isComplete = await checkOnboarding();
     return { needsOnboarding: !isComplete };
-  };
-
-  const checkOnboardingWithTokenAndReturn = async (authToken: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_URL}/api/onboarding/status`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setOnboardingComplete(data.is_complete);
-        return data.is_complete;
-      }
-    } catch (error) {
-      console.error('Failed to check onboarding:', error);
-    }
-    return false;
   };
 
   const signup = async (email: string, password: string, name?: string) => {
     const response = await fetch(`${API_URL}/api/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password, name }),
     });
 
@@ -133,18 +116,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await response.json();
 
-    setToken(data.access_token);
     setUser(data.user);
-    setOnboardingComplete(false); // New users need onboarding
-    localStorage.setItem('auth_token', data.access_token);
+    setOnboardingComplete(false);
     localStorage.setItem('auth_user', JSON.stringify(data.user));
   };
 
-  const logout = () => {
-    setToken(null);
+  const logout = async () => {
+    try {
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Logout even if server call fails
+    }
     setUser(null);
     setOnboardingComplete(false);
-    localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
   };
 
@@ -152,8 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!token,
+        isAuthenticated: !!user,
         isLoading,
         onboardingComplete,
         login,
