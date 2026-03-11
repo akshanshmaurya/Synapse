@@ -184,7 +184,7 @@ async def login(
                 "last_login": datetime.utcnow(),
                 "failed_attempts": 0,
                 "lock_until": None,
-            }, "$unset": {"lock_until": ""}},
+            }},
         )
 
         user_id = str(user["_id"])
