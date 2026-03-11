@@ -20,7 +20,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
-
+    return encoded_jwt
 
 def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT refresh token"""
