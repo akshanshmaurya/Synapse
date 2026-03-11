@@ -33,6 +33,7 @@ jobs:
 
       - name: Run tests
         env:
+          PYTHONPATH: "."
           MONGO_URI: "mongodb://localhost:27017"
           MONGODB_DB: "synapse_test"
           JWT_SECRET: "ci-test-secret-do-not-use-in-production"
