@@ -1,12 +1,12 @@
 """
 Auth API Tests — Synapse Backend
 Covers: signup, login, lockout, refresh, logout, change-password.
+These tests require a live MongoDB connection.
 """
 import pytest
-import asyncio
 
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.requires_db]
 
 
 async def _signup(client, email, password="TestPassword123!"):
