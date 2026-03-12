@@ -1,0 +1,22 @@
+{
+  "case": "partial_understanding",
+  "description": "User understands part of the concept but has gaps — mixed signals expected",
+  "steps": [
+    {
+      "user": "How does async/await work in Python?",
+      "assistant": "Async/await allows you to write concurrent code. 'async def' defines a coroutine, and 'await' pauses execution until the awaited task completes."
+    },
+    {
+      "user": "Ok so async makes the function run in the background, but I'm confused about when exactly await pauses things. Does it pause the whole program?",
+      "assistant": "Good question! 'await' only pauses the current coroutine, not the entire program. Other coroutines can run while one is waiting."
+    }
+  ],
+  "expected": {
+    "step_2": {
+      "clarity_range": [30, 65],
+      "confusion_trend": ["stable"],
+      "struggle_detected_possible": true,
+      "notes": "Partial understanding — some correct, some confused"
+    }
+  }
+}

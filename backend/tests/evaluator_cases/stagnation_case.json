@@ -1,0 +1,25 @@
+{
+  "case": "stagnation",
+  "description": "User repeatedly asks about the same topic without showing progress — stagnation expected",
+  "steps": [
+    {
+      "user": "What are Python decorators?",
+      "assistant": "Decorators are functions that modify the behavior of other functions by wrapping them."
+    },
+    {
+      "user": "Can you explain decorators again?",
+      "assistant": "Sure! A decorator takes a function, adds some functionality, and returns a modified version."
+    },
+    {
+      "user": "I still need help with decorators, tell me about them again.",
+      "assistant": "Let's approach decorators from scratch. At the most basic level..."
+    }
+  ],
+  "expected": {
+    "step_3": {
+      "stagnation_flags_not_empty": true,
+      "engagement_level": ["low", "medium"],
+      "response_effectiveness": ["needs_adjustment", "neutral"]
+    }
+  }
+}
