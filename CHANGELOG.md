@@ -4,6 +4,138 @@ All notable changes to the Synapse project are documented here.
 
 ---
 
+## [3.0.0] — 2026-03-12 — Phase 2: Testing Infrastructure Expansion
+
+### Overview
+
+Expanded the backend test suite from 12 tests to **77 tests** across 8 test files, achieving **52% code coverage** with zero external API calls and sub-5-second runtime.
+
+---
+
+### 1️⃣ JWT Token Tests (15 tests)
+
+**File**: `tests/test_jwt.py`
+
+- Access token creation, type claim (`access`), user data preservation
+- Refresh token creation, type claim (`refresh`), uniqueness
+- Type enforcement across access/refresh tokens
+- Verification of valid tokens, rejection of invalid/expired tokens
+- `decode_token()` returns user_id or None
+
+### 2️⃣ Agent Pipeline Tests (15 tests)
+
+**File**: `tests/test_agents_pipeline.py`
+
+- **Planner Agent**: Default strategy structure/values, valid JSON parsing, invalid JSON fallback, exception fallback, code fence stripping
+- **Executor Agent**: Response generation with mock, fallback on error
+- **Evaluator Agent**: Confusion fail-safe caps clarity score, normal messages allow increase, default evaluation structure, LLM error fallback
+- **Struggle Detection**: Normal message passes, keyword triggers analysis, case-insensitive detection
+
+All LLM calls mocked via `MagicMock(generate_content)` — **zero Gemini API calls**.
+
+### 3️⃣ API Endpoint Tests (11 tests)
+
+**File**: `tests/test_api_endpoints.py`
+
+- Auth-required endpoint rejection (chat, onboarding, roadmap, traces)
+- Public endpoint access (health check, onboarding questions)
+- Signup validation (missing email, missing password, invalid email, short password)
+
+### 4️⃣ Evaluator Logic Tests (6 tests)
+
+**File**: `tests/test_evaluator.py`
+
+- Clarity scoring invariants: correct paraphrase allows increase, confusion blocks increase
+- `"I'm confused"` triggers fail-safe (trend ≠ improving, struggle detected)
+- Stagnation flag preservation, pace adjustment passthrough
+- Roadmap feedback analysis: empty feedback returns no action, stuck feedback triggers analysis
+
+### 5️⃣ Error Handling Tests (8 tests)
+
+**File**: `tests/test_errors.py`
+
+- Validation errors (422): missing fields, invalid email, missing password
+- Auth errors: refresh without cookie (401), protected endpoint (401/403)
+- Rate limit errors (429): response format verification
+- Unknown routes (404)
+
+### 6️⃣ Coverage & CI
+
+**Files**: `pyproject.toml`, `requirements-dev.txt`, `.github/workflows/ci.yml`
+
+- Added `pytest-cov` to dev dependencies
+- Configured coverage: `source = ["app"]`, `fail_under = 30`
+- CI pipeline now runs: `ruff check` → `pytest --cov=app`
+- Registered custom `requires_db` marker
+
+### 7️⃣ Enhanced Test Infrastructure
+
+**File**: `tests/conftest.py`
+
+- `sample_user_context` fixture with realistic agent test data
+- `mock_genai_response` factory for creating mock LLM responses
+- `unique_email` and `valid_password` fixtures
+- MongoDB availability check with auto-skip for DB-dependent tests
+- Rate limiter reset between tests
+
+---
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `tests/conftest.py` | **[REWRITE]** Enhanced with agent fixtures, DB check |
+| `tests/test_jwt.py` | **[NEW]** 15 JWT tests |
+| `tests/test_agents_pipeline.py` | **[NEW]** 15 agent tests with mocked LLM |
+| `tests/test_api_endpoints.py` | **[NEW]** 11 API tests |
+| `tests/test_evaluator.py` | **[NEW]** 6 evaluator logic tests |
+| `tests/test_errors.py` | **[NEW]** 8 error handling tests |
+| `requirements-dev.txt` | Added `pytest-cov` |
+| `pyproject.toml` | Added coverage config, markers |
+| `.github/workflows/ci.yml` | Added `--cov` flags |
+
+---
+
+## [2.5.0] — 2026-03-11 — Phase 1.75: Repository Integrity & Security Hygiene
+
+### Overview
+
+Executed 11 infrastructure and security hygiene tasks to prepare the repository for Phase 2 (Testing Infrastructure).
+
+---
+
+### Tasks Completed
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | `.env.example` created with placeholder values | ✅ |
+| 2 | `.env` purged from Git history (BFG Repo-Cleaner) | ✅ |
+| 3 | `.gitignore` hardened (venv, __pycache__, .env, etc.) | ✅ |
+| 4 | `pyproject.toml` created (ruff + pytest config) | ✅ |
+| 5 | `requirements-dev.txt` created (pytest, ruff, black) | ✅ |
+| 6 | Structured audit logging for security events | ✅ |
+| 7 | Rate limiter scalability documented | ✅ |
+| 8 | Session invalidation on password change implemented | ✅ |
+| 9 | Refresh token replay protection verified | ✅ |
+| 10 | `.dockerignore` created | ✅ |
+| 11 | CI pipeline (GitHub Actions) configured | ✅ |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/.env.example` | **[NEW]** Environment template |
+| `backend/.dockerignore` | **[NEW]** Docker ignore rules |
+| `backend/requirements-dev.txt` | **[NEW]** Dev dependencies |
+| `backend/pyproject.toml` | **[NEW]** Ruff + pytest + coverage config |
+| `.github/workflows/ci.yml` | **[NEW]** CI pipeline |
+| `.gitignore` | Hardened with comprehensive patterns |
+| `backend/app/utils/logger.py` | Added audit event logging |
+| `backend/app/routes/auth.py` | Session invalidation on password change |
+
+---
+
+
 ## [2.1.0] — 2026-03-04 — Phase 1.5: Production Hardening
 
 ### Overview

@@ -92,14 +92,18 @@ Unlike generic chatbots, Synapse employs a **multi-agent architecture** where fo
 |---------|------|---------|
 | **MongoDB Atlas** | Document Database | Primary data store for users, memory, chats, roadmaps |
 
-### Development Tools
+### Development & Testing Tools
 
 | Category | Tool | Purpose |
 |----------|------|---------|
-| **Testing** | Vitest | Frontend testing |
+| **Backend Testing** | pytest + pytest-asyncio | 77 tests (unit + integration) |
+| **Coverage** | pytest-cov | 52%+ code coverage |
+| **Frontend Testing** | Vitest | Frontend testing |
 | **Linting** | ESLint + Ruff | Code quality |
 | **Formatting** | Prettier + Black | Code formatting |
 | **Type Checking** | TypeScript | Static type checking |
+| **CI/CD** | GitHub Actions | Automated lint + test + coverage |
+| **Container** | Docker | Backend containerization |
 
 ---
 
@@ -245,7 +249,7 @@ npm install
 npm run dev
 ```
 
-**Frontend runs at:** `http://localhost:5173`
+**Frontend runs at:** `http://localhost:8080`
 
 #### 3. Backend Setup
 
@@ -261,8 +265,11 @@ python -m venv venv
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+# Install production dependencies
 pip install -r requirements.txt
+
+# Install dev dependencies (testing, linting)
+pip install -r requirements-dev.txt
 
 # Create environment file
 copy .env.example .env
@@ -313,7 +320,7 @@ python -m uvicorn app.main:app --reload --port 8000
 - [ ] Create `.env` file in `backend/` directory
 - [ ] Start backend: `python -m uvicorn app.main:app --reload --port 8000`
 - [ ] Start frontend: `npm run dev`
-- [ ] Open `http://localhost:5173`
+- [ ] Open `http://localhost:8080`
 
 ---
 
@@ -396,14 +403,33 @@ synapse/
 │   │   ├── 📂 db/
 │   │   │   └── mongodb.py           # MongoDB connection
 │   │   │
-│   │   └── 📂 core/
-│   │       ├── config.py            # Settings
-│   │       ├── middleware.py        # Security headers
-│   │       └── rate_limiter.py      # Rate limiting
+│   │   ├── 📂 core/
+│   │   │   ├── config.py            # Settings
+│   │   │   ├── middleware.py        # Security headers
+│   │   │   └── rate_limiter.py      # Rate limiting
+│   │   │
+│   │   └── 📂 utils/
+│   │       └── logger.py            # Structured logging
 │   │
-│   ├── requirements.txt             # Python dependencies
-│   ├── pyproject.toml               # Python config
-│   └── Dockerfile                   # Container config
+│   ├── 📂 tests/                    # Backend Test Suite (77 tests)
+│   │   ├── conftest.py              # Shared fixtures + DB check
+│   │   ├── test_jwt.py              # JWT token tests (15)
+│   │   ├── test_agents_pipeline.py  # Agent tests w/ mocked LLM (15)
+│   │   ├── test_api_endpoints.py    # API integration tests (11)
+│   │   ├── test_auth.py             # Auth workflow tests (10)
+│   │   ├── test_errors.py           # Error handling tests (8)
+│   │   ├── test_password.py         # Password hashing tests (7)
+│   │   ├── test_evaluator.py        # Evaluator logic tests (6)
+│   │   └── test_rate_limiter.py     # Rate limiter tests (5)
+│   │
+│   ├── requirements.txt             # Production dependencies
+│   ├── requirements-dev.txt         # Dev dependencies (pytest, ruff)
+│   ├── pyproject.toml               # Ruff + pytest + coverage config
+│   ├── Dockerfile                   # Container config
+│   └── .dockerignore                # Docker ignore rules
+│
+├── 📂 .github/workflows/            # CI/CD
+│   └── ci.yml                       # GitHub Actions pipeline
 │
 ├── 📂 docs/                         # Documentation
 │   ├── BACKEND_ANALYSIS.md          # Backend detailed analysis
@@ -558,6 +584,78 @@ See [SECURITY.md](./SECURITY.md) for detailed security documentation.
 
 ---
 
+## 🧪 Testing & CI
+
+### Test Suite Overview
+
+**77 tests** covering authentication, agents, API endpoints, error handling, and core utilities — all running in **< 5 seconds** with **52%+ code coverage**.
+
+```mermaid
+pie title Test Distribution (77 tests)
+    "JWT Tokens" : 15
+    "Agent Pipeline" : 15
+    "API Endpoints" : 11
+    "Auth Workflow" : 10
+    "Error Handling" : 8
+    "Password" : 7
+    "Evaluator Logic" : 6
+    "Rate Limiter" : 5
+```
+
+### Coverage Highlights
+
+| Module | Coverage | What's Tested |
+|--------|----------|---------------|
+| `auth/password.py` | **100%** | Hash creation, verification, type enforcement |
+| `auth/jwt_handler.py` | **97%** | Token create, verify, decode, expiry, type claims |
+| `core/rate_limiter.py` | **97%** | Sliding window, IP isolation, expiration |
+| `core/config.py` | **100%** | Settings loading |
+| `core/middleware.py` | **93%** | CSP and security headers |
+| `models/*` | **100%** | All Pydantic models |
+
+### Agent Testing (Zero API Calls)
+
+All agent tests use **mocked LLM responses** — no Gemini API calls during testing:
+
+```mermaid
+flowchart LR
+    T[Test] --> M["MagicMock\n(generate_content)"]
+    M --> A[Agent Method]
+    A --> R[Assertions]
+    style M fill:#D4A574,stroke:#5C6B4A,color:#3D3D3D
+```
+
+- **Planner**: Strategy parsing, JSON fence stripping, fallback on invalid JSON
+- **Executor**: Response generation, fallback on error
+- **Evaluator**: Confusion fail-safe logic, clarity scoring invariants, struggle detection
+
+### CI Pipeline (GitHub Actions)
+
+Every push to `main`/`dev` and every pull request triggers:
+
+```
+Step 1: ruff check app/ tests/     → Lint (security + correctness rules)
+Step 2: pytest --cov=app            → 77 tests + coverage report
+```
+
+### Running Tests
+
+```bash
+# All tests
+pytest -q
+
+# With coverage
+pytest --cov=app --cov-report=term
+
+# Skip DB-dependent tests
+pytest -m "not requires_db" -q
+
+# Single file
+pytest tests/test_jwt.py -v
+```
+
+---
+
 ## 📡 API Reference
 
 ### Authentication Endpoints
@@ -652,6 +750,7 @@ See [BRAND_GUIDELINES.md](./BRAND_GUIDELINES.md) for complete guidelines.
 | [Frontend Analysis](./docs/FRONTEND_ANALYSIS.md) | Pages, components, state |
 | [Technical Guide](./docs/PROJECT_TECHNICAL_GUIDE.md) | Deep-dive for interviews |
 | [Agent Mechanics](./docs/AGENT_MECHANICS.md) | Agent system details |
+| [Security Audit](./docs/synapse_audit_report.md) | Feature verification audit |
 | [Brand Guidelines](./BRAND_GUIDELINES.md) | Design system |
 | [Security Policy](./SECURITY.md) | Security architecture |
 | [Changelog](./CHANGELOG.md) | Version history |
@@ -688,9 +787,11 @@ git push origin feature/amazing-feature
 
 | Check | Frontend Command | Backend Command |
 |-------|------------------|-----------------|
-| Lint | `npm run lint` | `ruff check app/` |
-| Type Check | `tsc --noEmit` | `ruff check app/` |
-| Test | `npm test` | `pytest` |
+| Lint | `npm run lint` | `ruff check app/ tests/` |
+| Type Check | `tsc --noEmit` | — |
+| Test | `npm test` | `pytest -q` |
+| Coverage | — | `pytest --cov=app --cov-report=term` |
+| Docker Build | — | `docker build -t synapse-backend .` |
 
 ---
 
@@ -704,4 +805,4 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
   <strong>Synapse</strong> — Built with intention for intentional learners.
   <br>
   <sub>Made with ❤️ using FastAPI + React</sub>
-</p>
+</p>

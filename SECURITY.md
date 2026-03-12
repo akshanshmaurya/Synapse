@@ -6,7 +6,12 @@ This document describes the security architecture implemented in the Synapse bac
 
 ## Security Overview
 
-Synapse implements a **defense-in-depth** security model across authentication, authorization, input validation, rate limiting, and transport security. All security features are production-grade and have been verified through Phase 1 (Engineering Hardening) and Phase 1.5 (Production Hardening).
+Synapse implements a **defense-in-depth** security model across authentication, authorization, input validation, rate limiting, and transport security. All security features are production-grade and have been verified through:
+
+- **Phase 1** — Engineering Hardening
+- **Phase 1.5** — Production Hardening
+- **Phase 1.75** — Repository Integrity & Security Hygiene
+- **Phase 2** — Testing Infrastructure (77 automated tests, 52%+ coverage)
 
 ---
 
@@ -184,6 +189,40 @@ All request payloads are validated via Pydantic `BaseModel` with `Field()` const
 - No `os.getenv()` calls exist in the application code
 
 **File**: `backend/app/core/config.py`
+
+---
+
+## Audit Logging
+
+Security-relevant events are logged via structured logging with category fields:
+
+| Event | Category | When |
+|-------|----------|------|
+| `LOGIN_SUCCESS` | `AUDIT` | Successful authentication |
+| `LOGIN_FAILED` | `AUDIT` | Invalid credentials |
+| `ACCOUNT_LOCKED` | `AUDIT` | 5 failed attempts |
+| `TOKEN_REFRESHED` | `AUDIT` | Refresh token rotation |
+| `TOKEN_REVOKED` | `AUDIT` | Session invalidation |
+| `PASSWORD_CHANGED` | `AUDIT` | Password update + session purge |
+
+**File**: `backend/app/utils/logger.py`, `backend/app/routes/auth.py`
+
+---
+
+## Automated Security Testing
+
+77 tests verify security behaviors automatically:
+
+| Test Category | Tests | Verified Behavior |
+|---------------|-------|-------------------|
+| JWT Tokens | 15 | Token creation, type enforcement, expiry, rejection |
+| Auth Workflow | 10 | Signup, login, lockout, refresh, logout |
+| API Endpoints | 11 | Unauthenticated rejection, public endpoint access |
+| Rate Limiting | 5 | Sliding window, IP isolation, 429 responses |
+| Error Handling | 8 | Validation (422), auth (401), rate limit (429) |
+| Password | 7 | bcrypt hashing, verification, empty hash handling |
+
+**Files**: `backend/tests/test_*.py`
 
 ---
 
