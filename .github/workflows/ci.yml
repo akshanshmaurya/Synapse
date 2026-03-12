@@ -31,7 +31,7 @@ jobs:
       - name: Run ruff lint
         run: ruff check app/ tests/
 
-      - name: Run tests
+      - name: Run tests with coverage
         env:
           PYTHONPATH: "."
           MONGO_URI: "mongodb://localhost:27017"
@@ -39,4 +39,4 @@ jobs:
           JWT_SECRET: "ci-test-secret-do-not-use-in-production"
           GEMINI_API_KEY: "ci-test-key"
           ENVIRONMENT: "development"
-        run: pytest -q --tb=short
+        run: pytest -q --tb=short --cov=app --cov-report=term

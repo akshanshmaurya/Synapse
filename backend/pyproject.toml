@@ -41,6 +41,17 @@ asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "requires_db: tests that need a live MongoDB connection",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/agents/*", "app/services/dashboard_service.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 30
 
 [tool.black]
 line-length = 120
