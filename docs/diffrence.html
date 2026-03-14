@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --alabaster: #f9f8f4;
+            --stone-600: #e3ded1;
+            --stone-800: #a8a29e;
+            --glass-white: rgba(255, 255, 255, 0.45);
+        }
+
+        body {
+            background-color: #f4f2ee;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .grain-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .alabaster-depth {
+            background: var(--glass-white);
+            backdrop-filter: blur(30px) saturate(160%);
+            -webkit-backdrop-filter: blur(30px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow:
+                inset 0 0 30px rgba(255, 255, 255, 0.5),
+                0 15px 35px -5px rgba(0, 0, 0, 0.04),
+                0 5px 15px rgba(0, 0, 0, 0.02);
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .alabaster-depth:hover {
+            transform: translateY(-8px) scale(1.01);
+            box-shadow:
+                inset 0 0 40px rgba(255, 255, 255, 0.8),
+                0 30px 60px -12px rgba(0, 0, 0, 0.08);
+        }
+
+        .mono-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #1a1a1a 0%, #666666 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .reveal-up {
+            animation: revealUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes revealUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .floating-element {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-15px);
+            }
+        }
+
+        .radial-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(244, 242, 238, 0) 70%);
+            z-index: -1;
+            filter: blur(40px);
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-12 lg:p-24 relative">
+    <div class="grain-overlay"></div>
+    <div class="radial-glow top-[-10%] left-[-10%] opacity-60"></div>
+    <div class="radial-glow bottom-[-10%] right-[-10%] opacity-40"></div>
+
+    <section class="max-w-7xl mx-auto">
+        <!-- Header Section -->
+        <div class="mb-20 reveal-up">
+            <span class="mono-tag text-stone-500 mb-4 block">Section // 04 — The Differentiation</span>
+            <h2 class="text-5xl md:text-7xl font-extrabold tracking-tight text-stone-900 leading-[1.1]">
+                Beyond <span class="gradient-text">Connection.</span><br />
+                Into <span class="italic font-light text-stone-500">Mastery.</span>
+            </h2>
+            <p class="mt-8 text-lg text-stone-600 max-w-xl leading-relaxed">
+                We aren't a marketplace of bios. We are an architect of trajectories. Our platform uses translucent
+                matching algorithms and high-fidelity tracking to ensure mentorship isn't just a meeting, but a
+                transformation.
+            </p>
+        </div>
+
+        <!-- Grid Component -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+
+            <!-- Main Large Feature -->
+            <div class="md:col-span-7 alabaster-depth rounded-[2.5rem] p-10 flex flex-col justify-between min-h-[500px] reveal-up"
+                style="animation-delay: 0.1s;">
+                <div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-stone-200 flex items-center justify-center mb-10 bg-white/50">
+                        <span class="mono-tag text-[10px]">01</span>
+                    </div>
+                    <h3 class="text-3xl font-semibold text-stone-900 mb-6">Psychometric Matching Engine</h3>
+                    <p class="text-stone-600 text-lg leading-relaxed max-w-md">
+                        Our engine doesn't just look at LinkedIn titles. It analyzes cognitive styles, communication
+                        tempos, and long-term career resonance to find your perfect professional mirror.
+                    </p>
+                </div>
+                <div class="mt-12 flex flex-wrap gap-3">
+                    <span class="px-4 py-2 rounded-full bg-stone-900 text-white mono-tag text-[9px]">LSI
+                        Integration</span>
+                    <span
+                        class="px-4 py-2 rounded-full border border-stone-300 mono-tag text-[9px] text-stone-600">Dynamic
+                        Sync</span>
+                    <span class="px-4 py-2 rounded-full border border-stone-300 mono-tag text-[9px] text-stone-600">Vibe
+                        Check AI</span>
+                </div>
+            </div>
+
+            <!-- Side Feature 1 -->
+            <div class="md:col-span-5 alabaster-depth rounded-[2.5rem] p-10 reveal-up" style="animation-delay: 0.2s;">
+                <div
+                    class="w-12 h-12 rounded-full border border-stone-200 flex items-center justify-center mb-8 bg-white/50">
+                    <span class="mono-tag text-[10px]">02</span>
+                </div>
+                <h3 class="text-2xl font-semibold text-stone-900 mb-4">Curation Over Capacity</h3>
+                <p class="text-stone-600 leading-relaxed mb-8">
+                    We maintain a 3:1 mentee-to-mentor ratio. Every mentor on this platform is active in high-growth
+                    industries, not just "available."
+                </p>
+                <div
+                    class="h-[140px] w-full bg-stone-100/50 rounded-2xl overflow-hidden relative flex items-center justify-center">
+                    <div
+                        class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+                    </div>
+                    <div class="z-10 text-stone-400 mono-tag text-[10px] italic">Strict 5% Acceptance Rate</div>
+                </div>
+            </div>
+
+            <!-- Side Feature 2 -->
+            <div class="md:col-span-5 alabaster-depth rounded-[2.5rem] p-10 reveal-up" style="animation-delay: 0.3s;">
+                <div
+                    class="w-12 h-12 rounded-full border border-stone-200 flex items-center justify-center mb-8 bg-white/50">
+                    <span class="mono-tag text-[10px]">03</span>
+                </div>
+                <h3 class="text-2xl font-semibold text-stone-900 mb-4">Proof of Progress</h3>
+                <p class="text-stone-600 leading-relaxed">
+                    Visualized growth tracking that translates coffee chats into quantifiable skill milestones. Export
+                    your progress as a verified career credential.
+                </p>
+            </div>
+
+            <!-- Bottom CTA Feature -->
+            <div class="md:col-span-7 alabaster-depth rounded-[2.5rem] p-10 flex flex-col md:flex-row gap-10 items-center justify-between reveal-up"
+                style="animation-delay: 0.4s;">
+                <div class="max-w-sm">
+                    <h3 class="text-3xl font-semibold text-stone-900 mb-4">Experience the Depth</h3>
+                    <p class="text-stone-600">Join the top 1% of talent elevating their craft through tactical
+                        mentorship.</p>
+                </div>
+                <a href="#"
+                    class="group relative inline-flex items-center px-8 py-4 bg-stone-900 text-white rounded-full overflow-hidden transition-all hover:pr-12">
+                    <span class="relative z-10 mono-tag text-[11px]">Apply Now</span>
+                    <svg class="absolute right-4 w-5 h-5 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+                    </svg>
+                </a>
+            </div>
+
+        </div>
+
+        <!-- Footer Metric Decoration -->
+        <div class="mt-24 border-t border-stone-200 pt-8 flex flex-wrap justify-between items-center opacity-60">
+            <div class="flex gap-12">
+                <div>
+                    <span class="block text-2xl font-light text-stone-900">98%</span>
+                    <span class="mono-tag text-[9px] text-stone-500">Retention Rate</span>
+                </div>
+                <div>
+                    <span class="block text-2xl font-light text-stone-900">12k+</span>
+                    <span class="mono-tag text-[9px] text-stone-500">Matches Made</span>
+                </div>
+                <div>
+                    <span class="block text-2xl font-light text-stone-900">4.9/5</span>
+                    <span class="mono-tag text-[9px] text-stone-500">Avg. Outcome</span>
+                </div>
+            </div>
+            <div class="hidden md:block">
+                <span class="mono-tag text-[10px] text-stone-400">Refined for Professionals // 2024 Edition</span>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Subtle interaction: follow mouse with glow
+        document.addEventListener('mousemove', (e) => {
+            const glow = document.querySelector('.radial-glow');
+            const x = e.clientX;
+            const y = e.clientY;
+            glow.style.transform = `translate(${x / 20}px, ${y / 20}px)`;
+        });
+
+        // Intersection Observer for reveal animations
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('reveal-up');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal-up').forEach(el => observer.observe(el));
+    </script>
+</body>
+
+</html>

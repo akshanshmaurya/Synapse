@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --vellum-bg: rgba(255, 255, 255, 0.45);
+            --vellum-border: rgba(255, 255, 255, 0.8);
+            --accent: #1a1a1a;
+            --muted: #666666;
+            --bg-color: #f4f4f2;
+            --glass-blur: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--accent);
+            overflow-x: hidden;
+        }
+
+        /* Paper Grain Overlay */
+        .grain-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .section-container {
+            position: relative;
+            padding: 120px 5% 160px;
+            max-width: 1400px;
+            margin: 0 auto;
+            min-height: 100vh;
+        }
+
+        .header-block {
+            margin-bottom: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .mono-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--muted);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .main-title {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 800;
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+            max-width: 900px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+        }
+
+        /* Vellum Layer System */
+        .vellum-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+            position: relative;
+        }
+
+        .vellum-card {
+            position: relative;
+            grid-column: span 4;
+            padding: 40px;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(40px);
+        }
+
+        .vellum-card.visible {
+            animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .vellum-card:nth-child(2) {
+            animation-delay: 0.2s;
+            margin-top: 60px;
+        }
+
+        .vellum-card:nth-child(3) {
+            animation-delay: 0.4s;
+            margin-top: 120px;
+        }
+
+        .vellum-sheet {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--vellum-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--vellum-border);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+            z-index: -1;
+            transition: transform 0.5s ease, background 0.5s ease;
+        }
+
+        /* Shadow Layer Effect */
+        .vellum-sheet::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: -8px;
+            bottom: -8px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            z-index: -2;
+            pointer-events: none;
+            transition: transform 0.5s ease;
+        }
+
+        .vellum-card:hover .vellum-sheet {
+            background: rgba(255, 255, 255, 0.7);
+            transform: translateY(-8px) scale(1.02);
+        }
+
+        .vellum-card:hover .vellum-sheet::after {
+            transform: translate(4px, 4px);
+        }
+
+        .card-index {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 40px;
+            display: block;
+        }
+
+        .card-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .card-description {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--muted);
+            max-width: 280px;
+        }
+
+        .card-footer {
+            margin-top: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-footer::before {
+            content: '';
+            width: 30px;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        /* Ambient Decoration */
+        .ambient-orb {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+            top: 10%;
+            right: -10%;
+            z-index: -5;
+            filter: blur(80px);
+            pointer-events: none;
+        }
+
+        @keyframes reveal {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .vellum-card {
+                grid-column: span 6;
+                margin-top: 0 !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .vellum-card {
+                grid-column: span 12;
+            }
+
+            .main-title {
+                font-size: 3.5rem;
+            }
+
+            .section-container {
+                padding-top: 60px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="grain-overlay"></div>
+    <div class="ambient-orb"></div>
+
+    <section class="section-container">
+        <header class="header-block">
+            <span class="mono-label">// Target Cohorts</span>
+            <h1 class="main-title">A sanctuary for the architect of tomorrow.</h1>
+        </header>
+
+        <div class="vellum-grid">
+            <!-- Card 01 -->
+            <div class="vellum-card">
+                <div class="vellum-sheet"></div>
+                <div class="card-content">
+                    <span class="card-index">01/</span>
+                    <h3 class="card-title">The Emerging Lead</h3>
+                    <p class="card-description">Individual contributors transitioning into the complex landscape of
+                        creative leadership and strategy.</p>
+                </div>
+                <div class="card-footer">MANAGEMENT TRACK</div>
+            </div>
+
+            <!-- Card 02 -->
+            <div class="vellum-card">
+                <div class="vellum-sheet"></div>
+                <div class="card-content">
+                    <span class="card-index">02/</span>
+                    <h3 class="card-title">The Solo Founder</h3>
+                    <p class="card-description">Visionaries building at the intersection of design and code, requiring
+                        rapid iteration frameworks.</p>
+                </div>
+                <div class="card-footer">PRODUCT VELOCITY</div>
+            </div>
+
+            <!-- Card 03 -->
+            <div class="vellum-card">
+                <div class="vellum-sheet"></div>
+                <div class="card-content">
+                    <span class="card-index">03/</span>
+                    <h3 class="card-title">The Design Systems Thinker</h3>
+                    <p class="card-description">Crafters focused on the scalability of aesthetics and the governance of
+                        digital languages.</p>
+                </div>
+                <div class="card-footer">SCALABLE CRAFT</div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Smooth reveal on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.vellum-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Parallax effect for cards
+        window.addEventListener('mousemove', (e) => {
+            const cards = document.querySelectorAll('.vellum-sheet');
+            const x = (e.clientX / window.innerWidth - 0.5) * 15;
+            const y = (e.clientY / window.innerHeight - 0.5) * 15;
+
+            cards.forEach(sheet => {
+                sheet.style.boxShadow = `${-x}px ${-y}px 50px rgba(0,0,0,0.02)`;
+            });
+        });
+    </script>
+</body>
+
+</html>

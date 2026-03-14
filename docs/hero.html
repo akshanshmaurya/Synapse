@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Monoliths</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;700&family=JetBrains+Mono:wght@300;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --stone-white: #fcfcf9;
+            --stone-shadow: rgba(200, 190, 180, 0.15);
+            --alabaster-glow: rgba(255, 255, 255, 0.8);
+            --text-main: #1a1a18;
+            --text-muted: #6b6b64;
+            --accent: #e5e5e0;
+            --transition: cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--stone-white);
+            font-family: 'Instrument Sans', sans-serif;
+            color: var(--text-main);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* The Grain Overlay */
+        .grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            align-items: center;
+            padding: 0 8%;
+            gap: 4rem;
+        }
+
+        .hero-content {
+            z-index: 10;
+            max-width: 640px;
+        }
+
+        .mono-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: reveal 0.8s var(--transition) forwards;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 6vw, 5rem);
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            margin-bottom: 2rem;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: reveal 0.8s var(--transition) 0.1s forwards;
+        }
+
+        p {
+            font-size: 1.25rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: reveal 0.8s var(--transition) 0.2s forwards;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1.5rem;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: reveal 0.8s var(--transition) 0.3s forwards;
+        }
+
+        .btn {
+            padding: 1.25rem 2.5rem;
+            border-radius: 100px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.4s var(--transition);
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--text-main);
+            color: white;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-secondary {
+            border: 1px solid var(--accent);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent);
+        }
+
+        /* The Monoliths */
+        .monolith-scene {
+            position: relative;
+            height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .monolith-container {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-end;
+            height: 100%;
+        }
+
+        .monolith {
+            position: relative;
+            width: 140px;
+            background: linear-gradient(180deg, var(--alabaster-glow) 0%, rgba(255, 255, 255, 0.2) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 100px 100px 20px 20px;
+            box-shadow:
+                20px 40px 80px var(--stone-shadow),
+                inset 0 0 20px rgba(255, 255, 255, 0.5);
+            transition: all 0.7s var(--transition);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 2rem 1rem;
+            overflow: hidden;
+            animation: float 6s ease-in-out infinite alternate;
+        }
+
+        .monolith:nth-child(1) {
+            height: 60%;
+            animation-delay: 0s;
+        }
+
+        .monolith:nth-child(2) {
+            height: 85%;
+            animation-delay: -1.5s;
+            width: 160px;
+        }
+
+        .monolith:nth-child(3) {
+            height: 50%;
+            animation-delay: -3s;
+        }
+
+        .monolith::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.8s var(--transition);
+        }
+
+        .monolith:hover {
+            transform: translateY(-20px) scale(1.02);
+            box-shadow: 30px 60px 100px var(--stone-shadow);
+            background: white;
+        }
+
+        .monolith:hover::before {
+            transform: translateX(100%);
+        }
+
+        .monolith-label {
+            font-family: 'JetBrains Mono', monospace;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: auto auto 1rem auto;
+            letter-spacing: 0.2em;
+            opacity: 0.6;
+        }
+
+        .monolith-icon {
+            width: 10px;
+            height: 10px;
+            background: var(--text-main);
+            border-radius: 50%;
+            margin: 0 auto;
+        }
+
+        @keyframes reveal {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0);
+            }
+
+            100% {
+                transform: translateY(-30px);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .hero {
+                grid-template-columns: 1fr;
+                padding-top: 120px;
+                text-align: center;
+            }
+
+            .hero-content {
+                margin: 0 auto;
+            }
+
+            .cta-group {
+                justify-content: center;
+            }
+
+            .monolith-scene {
+                height: 50vh;
+            }
+
+            .monolith {
+                width: 80px;
+            }
+
+            .monolith:nth-child(2) {
+                width: 100px;
+            }
+        }
+
+        /* Abstract Glow background */
+        .bg-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(230, 225, 210, 0.4) 0%, transparent 70%);
+            top: -200px;
+            right: -100px;
+            z-index: -1;
+            filter: blur(60px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="grain"></div>
+    <div class="bg-glow"></div>
+
+    <section class="hero">
+        <div class="hero-content">
+            <span class="mono-tag">// ARCHITECT YOUR TRAJECTORY</span>
+            <h1>Carve your path from the <span style="color: #999;">raw stone</span> of potential.</h1>
+            <p>Expert career guidance distilled into a structural framework. We transform uncertainty into monoliths of
+                professional certainty.</p>
+
+            <div class="cta-group">
+                <a href="#" class="btn btn-primary">Start Exploration</a>
+                <a href="#" class="btn btn-secondary">View Methodologies</a>
+            </div>
+        </div>
+
+        <div class="monolith-scene">
+            <div class="monolith-container">
+                <div class="monolith">
+                    <span class="monolith-label">DESIGN.SYS</span>
+                    <div class="monolith-icon"></div>
+                </div>
+                <div class="monolith">
+                    <span class="monolith-label">ENGINEERING.CORE</span>
+                    <div class="monolith-icon"></div>
+                </div>
+                <div class="monolith">
+                    <span class="monolith-label">STRATEGY.VOID</span>
+                    <div class="monolith-icon"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Subtle Mouse Interaction for the Monoliths
+        document.addEventListener('mousemove', (e) => {
+            const monoliths = document.querySelectorAll('.monolith');
+            const x = (e.clientX / window.innerWidth - 0.5) * 20;
+            const y = (e.clientY / window.innerHeight - 0.5) * 20;
+
+            monoliths.forEach((m, index) => {
+                const depth = (index + 1) * 0.5;
+                m.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+            });
+        });
+
+        // Reset transform when mouse leaves (optional, but smoother)
+        document.querySelector('.monolith-container').addEventListener('mouseleave', () => {
+            const monoliths = document.querySelectorAll('.monolith');
+            monoliths.forEach(m => {
+                m.style.transform = `translate(0, 0)`;
+            });
+        });
+    </script>
+</body>
+
+</html>

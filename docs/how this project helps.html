@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #0a0a0a;
+            --accent: #ffffff;
+            --channel: #151515;
+            --text-muted: #555;
+            --edge-highlight: rgba(255, 255, 255, 0.08);
+            --glow: rgba(255, 255, 255, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--accent);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .honed-container {
+            position: relative;
+            padding: 10vh 10vw;
+            display: flex;
+            flex-direction: column;
+            gap: 20rem;
+            min-height: 200vh;
+        }
+
+        /* The Monolithic Channel (SVG Background) */
+        .channel-system {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .channel-path-bg {
+            fill: none;
+            stroke: var(--channel);
+            stroke-width: 4px;
+            stroke-linecap: round;
+        }
+
+        .channel-path-active {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 2px;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            filter: drop-shadow(0 0 8px var(--glow));
+            transition: stroke-dashoffset 0.1s linear;
+        }
+
+        /* Content Blocks */
+        .process-node {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .process-node:nth-child(even) {
+            text-align: right;
+        }
+
+        .process-node:nth-child(even) .content-wrapper {
+            grid-column: 2;
+        }
+
+        .process-node:nth-child(odd) .content-wrapper {
+            grid-column: 1;
+        }
+
+        .content-wrapper {
+            max-width: 500px;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .content-wrapper.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .node-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .process-node:nth-child(even) .node-meta {
+            flex-direction: row-reverse;
+        }
+
+        .node-meta::before {
+            content: '';
+            width: 40px;
+            height: 1px;
+            background: var(--channel);
+        }
+
+        .node-title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            line-height: 0.9;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+        }
+
+        .node-description {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            max-width: 40ch;
+        }
+
+        .process-node:nth-child(even) .node-description {
+            margin-left: auto;
+        }
+
+        /* Large Background Numbers */
+        .node-index {
+            position: absolute;
+            font-size: 15vw;
+            font-weight: 900;
+            color: transparent;
+            -webkit-text-stroke: 1px var(--channel);
+            z-index: -1;
+            top: -20%;
+            left: 45%;
+            user-select: none;
+        }
+
+        /* The Pulse Orb */
+        .pulse-orb {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--accent);
+            offset-path: path("M 600 0 L 600 200 C 600 350 300 350 300 500 L 300 700 C 300 850 900 850 900 1000 L 900 1200 C 900 1350 600 1350 600 1500 L 600 2000");
+            offset-distance: 0%;
+            z-index: 2;
+        }
+
+        @media (max-width: 1024px) {
+            .honed-container {
+                padding: 5vh 5vw;
+            }
+
+            .process-node {
+                grid-template-columns: 1fr;
+                text-align: left !important;
+            }
+
+            .process-node:nth-child(even) .content-wrapper {
+                grid-column: 1;
+            }
+
+            .node-index {
+                left: 0;
+            }
+
+            .channel-system {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <section class="honed-container" id="process-section">
+        <div class="pulse-orb" id="orb"></div>
+
+        <svg class="channel-system" preserveAspectRatio="none" viewBox="0 0 1200 2000">
+            <!-- Honed Channel Background -->
+            <path class="channel-path-bg"
+                d="M 600 0 L 600 200 C 600 350 300 350 300 500 L 300 700 C 300 850 900 850 900 1000 L 900 1200 C 900 1350 600 1350 600 1500 L 600 2000" />
+            <!-- Active Laser Path -->
+            <path class="channel-path-active" id="main-path"
+                d="M 600 0 L 600 200 C 600 350 300 350 300 500 L 300 700 C 300 850 900 850 900 1000 L 900 1200 C 900 1350 600 1350 600 1500 L 600 2000" />
+        </svg>
+
+        <!-- Step 01 -->
+        <div class="process-node">
+            <div class="node-index">01</div>
+            <div class="content-wrapper">
+                <div class="node-meta">Phase_01 // Discovery</div>
+                <h2 class="node-title">Deep Substrate<br>Analysis</h2>
+                <p class="node-description">
+                    We penetrate the surface requirements to uncover the underlying architectural constraints and
+                    opportunities within your ecosystem.
+                </p>
+            </div>
+        </div>
+
+        <!-- Step 02 -->
+        <div class="process-node">
+            <div class="node-index">02</div>
+            <div class="content-wrapper">
+                <div class="node-meta">Phase_02 // Design</div>
+                <h2 class="node-title">Monolithic<br>Structure</h2>
+                <p class="node-description">
+                    Forging high-fidelity interfaces that balance brutalist proportions with refined,
+                    micro-interactional precision.
+                </p>
+            </div>
+        </div>
+
+        <!-- Step 03 -->
+        <div class="process-node">
+            <div class="node-index">03</div>
+            <div class="content-wrapper">
+                <div class="node-meta">Phase_03 // Engineering</div>
+                <h2 class="node-title">Kinetic<br>Integration</h2>
+                <p class="node-description">
+                    Translating static geometries into dynamic, hardware-accelerated experiences optimized for pure
+                    performance.
+                </p>
+            </div>
+        </div>
+
+        <!-- Step 04 -->
+        <div class="process-node">
+            <div class="node-index">04</div>
+            <div class="content-wrapper">
+                <div class="node-meta">Phase_04 // Deployment</div>
+                <h2 class="node-title">System<br>Activation</h2>
+                <p class="node-description">
+                    The final honing. Deploying the finalized monolithic entity into the digital wild with absolute
+                    stability.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const mainPath = document.getElementById('main-path');
+        const orb = document.getElementById('orb');
+        const length = mainPath.getTotalLength();
+        const nodes = document.querySelectorAll('.content-wrapper');
+
+        // Initialize path
+        mainPath.style.strokeDasharray = length;
+        mainPath.style.strokeDashoffset = length;
+
+        const updateAnimation = () => {
+            const container = document.getElementById('process-section');
+            const rect = container.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+
+            // Calculate scroll percentage relative to the process section
+            const start = rect.top;
+            const scrollDistance = -start;
+            const totalHeight = rect.height - viewportHeight;
+
+            let progress = scrollDistance / totalHeight;
+            progress = Math.max(0, Math.min(1, progress));
+
+            // Update Path
+            const drawLength = length * progress;
+            mainPath.style.strokeDashoffset = length - drawLength;
+
+            // Update Orb
+            orb.style.offsetDistance = (progress * 100) + "%";
+            orb.style.opacity = progress > 0 && progress < 0.99 ? 1 : 0;
+
+            // Content revealing
+            nodes.forEach((node, index) => {
+                const nodeRect = node.getBoundingClientRect();
+                if (nodeRect.top < viewportHeight * 0.7) {
+                    node.classList.add('visible');
+                } else {
+                    node.classList.remove('visible');
+                }
+            });
+        };
+
+        window.addEventListener('scroll', () => {
+            requestAnimationFrame(updateAnimation);
+        });
+
+        // Initial check
+        updateAnimation();
+    </script>
+</body>
+
+</html>

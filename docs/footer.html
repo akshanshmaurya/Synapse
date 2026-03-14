@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;900&family=Space+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --paper-light: #f9f7f2;
+            --paper-mid: #f2eee3;
+            --paper-dark: #e8e4d5;
+            --ink: #151513;
+            --accent: #d44d2e;
+            --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3e%3cfilter id='noiseFilter'%3e%3cteTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3e%3c/filter%3e%3crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3e%3c/svg%3e");
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #111;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .stratified-footer {
+            position: relative;
+            width: 100%;
+            padding-top: 120px;
+            overflow: hidden;
+            background: #111;
+        }
+
+        /* The Grain Layer Overlay */
+        .parchment-texture {
+            position: absolute;
+            inset: 0;
+            opacity: 0.04;
+            pointer-events: none;
+            background-image: var(--grain);
+            z-index: 10;
+            mix-blend-mode: multiply;
+        }
+
+        /* Stratified Paper Layers */
+        .layer {
+            position: relative;
+            width: 100%;
+            padding: 80px 5% 40px;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .layer-bottom {
+            background-color: var(--paper-dark);
+            z-index: 1;
+            margin-top: -40px;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+            clip-path: polygon(0 15%, 100% 0, 100% 100%, 0% 100%);
+        }
+
+        .layer-middle {
+            background-color: var(--paper-mid);
+            z-index: 2;
+            margin-top: -60px;
+            box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.15);
+            clip-path: polygon(0 10%, 100% 20%, 100% 100%, 0% 100%);
+        }
+
+        .layer-top {
+            background-color: var(--paper-light);
+            z-index: 3;
+            margin-top: -80px;
+            box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.1);
+            clip-path: polygon(0 0, 100% 10%, 100% 100%, 0% 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 60px;
+        }
+
+        /* Typography Styles */
+        .footer-brand {
+            font-size: clamp(4rem, 15vw, 12rem);
+            font-weight: 900;
+            color: var(--ink);
+            line-height: 0.8;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            width: 100%;
+        }
+
+        .footer-col h4 {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 24px;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-link {
+            display: block;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--ink);
+            text-decoration: none;
+            margin-bottom: 12px;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            width: fit-content;
+        }
+
+        .footer-link:hover {
+            opacity: 1;
+            transform: translateX(8px);
+            color: var(--accent);
+        }
+
+        .footer-cta {
+            position: relative;
+            padding: 40px;
+            border: 1px solid rgba(21, 21, 19, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 40px;
+        }
+
+        .cta-text {
+            max-width: 400px;
+            font-size: 1.2rem;
+            line-height: 1.4;
+            color: var(--ink);
+        }
+
+        .stamp {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px dashed var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            font-weight: bold;
+            color: var(--accent);
+            transform: rotate(-15deg);
+            font-size: 0.7rem;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .bottom-bar {
+            border-top: 1px solid rgba(21, 21, 19, 0.05);
+            padding: 30px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--ink);
+            opacity: 0.6;
+        }
+
+        /* Micro-interactions */
+        .layer:hover {
+            transform: translateY(-10px);
+        }
+
+        @media (max-width: 768px) {
+            .footer-cta {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 30px;
+            }
+        }
+
+        /* Reveal Animation */
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-in {
+            animation: slideUp 1.2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div
+        style="height: 50vh; display: flex; align-items: center; justify-content: center; color: white; font-family: 'Space Mono';">
+        SCROLL DOWN
+    </div>
+
+    <footer class="stratified-footer">
+        <div class="parchment-texture"></div>
+
+        <!-- Base Layer -->
+        <div class="layer layer-bottom">
+            <div class="bottom-bar">
+                <span>VER. 2024.09 — ALL RIGHTS RESERVED.</span>
+                <span>DESIGNED IN THE VOID</span>
+                <span>40.7128° N, 74.0060° W</span>
+            </div>
+        </div>
+
+        <!-- Middle Layer -->
+        <div class="layer layer-middle">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h4>Internal</h4>
+                    <a href="#" class="footer-link">The Archive</a>
+                    <a href="#" class="footer-link">Process Methodology</a>
+                    <a href="#" class="footer-link">Material Research</a>
+                    <a href="#" class="footer-link">Inventory</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Socials</h4>
+                    <a href="#" class="footer-link">Instagram</a>
+                    <a href="#" class="footer-link">Read.cv</a>
+                    <a href="#" class="footer-link">Are.na</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Contact</h4>
+                    <a href="#" class="footer-link">hello@studio.xyz</a>
+                    <a href="#" class="footer-link">+1 800-TACTILE</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Layer -->
+        <div class="layer layer-top animate-in">
+            <h2 class="footer-brand">FINIS.</h2>
+
+            <div class="footer-cta">
+                <div class="cta-text">
+                    Let's discuss the stratification of your next project. We build digital experiences that feel
+                    tangible.
+                </div>
+                <div class="stamp">
+                    ORIGINAL<br>EDITION
+                </div>
+            </div>
+
+            <div style="font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--accent);">
+                ESTABLISHED MMXXIV — CURRENTLY OPEN FOR COLLABORATION
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Simple Intersection Observer for the entry animation
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = "1";
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.layer').forEach(layer => {
+            observer.observe(layer);
+        });
+
+        // Parallax effect on mouse move for stratification feel
+        document.addEventListener('mousemove', (e) => {
+            const x = (window.innerWidth / 2 - e.pageX) / 50;
+            const y = (window.innerHeight / 2 - e.pageY) / 50;
+
+            document.querySelector('.layer-top').style.transform = `translateX(${x}px) translateY(${y - 80}px)`;
+            document.querySelector('.layer-middle').style.transform = `translateX(${x * 0.5}px) translateY(${(y * 0.5) - 60}px)`;
+        });
+    </script>
+</body>
+</html>
