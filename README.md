@@ -30,7 +30,7 @@
 
 ## 🌟 Overview
 
-Synapse is an **AI-powered growth mentorship platform** that provides:
+Synapse is an **AI-powered growth mentorship platform** that provides :
 
 | Feature | Description |
 |---------|-------------|
