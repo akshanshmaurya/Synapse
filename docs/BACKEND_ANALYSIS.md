@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Architecture Overview
+## 1. Architecture ` Overview
 
 ```
 backend/
