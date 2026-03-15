@@ -104,7 +104,8 @@ def _compute_session_activity(interactions: list) -> list:
                 else:
                     day = str(ts)[:10]
                 day_counts[day] = day_counts.get(day, 0) + 1
-            except Exception:
+            except Exception as e:
+                logger.warning("Error parsing timestamp in session metrics: %s", e)
                 continue
 
     # Fill in the last 30 days

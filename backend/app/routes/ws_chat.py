@@ -113,5 +113,5 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
         logger.error("WebSocket unexpected error: %s", e)
         try:
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Error closing websocket during intentional close: %s", e)
