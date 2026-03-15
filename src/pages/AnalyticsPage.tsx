@@ -3,19 +3,23 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Home, MessageSquare, Map, User, BarChart3, ChevronRight,
-    Loader2, LogOut, TrendingUp, TrendingDown, Minus, Activity,
-    AlertTriangle, Zap, Brain
+    LogOut, TrendingUp, TrendingDown, Minus, Activity,
+    AlertTriangle, Zap, Brain, ArrowRight
 } from "lucide-react";
 import {
-    LineChart, Line, AreaChart, Area, BarChart, Bar,
+    AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAnalyticsData, AnalyticsData } from "@/services/api";
-import Logo from "@/components/Logo";
+
+/* ──────────────────────────────────────────────
+   Animation Presets (Landing Page system)
+   ────────────────────────────────────────────── */
+const ease = [0.23, 1, 0.32, 1];
 
 export default function AnalyticsPage() {
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -44,270 +48,299 @@ export default function AnalyticsPage() {
 
     const getTrendIcon = (trend: string) => {
         switch (trend) {
-            case "improving": return <TrendingUp className="w-4 h-4 text-emerald-600" />;
-            case "worsening": return <TrendingDown className="w-4 h-4 text-amber-600" />;
+            case "improving": return <TrendingUp className="w-4 h-4 text-emerald-500" />;
+            case "worsening": return <TrendingDown className="w-4 h-4 text-amber-500" />;
             default: return <Minus className="w-4 h-4 text-[#8B8178]" />;
         }
     };
 
-    const getPaceColor = (pace: string) => {
-        switch (pace) {
-            case "fast": return "text-emerald-600 bg-emerald-50";
-            case "slow": return "text-amber-600 bg-amber-50";
-            default: return "text-[#5C6B4A] bg-[#5C6B4A]/10";
+    const getTrendLabel = (trend: string) => {
+        switch (trend) {
+            case "improving": return "Improving";
+            case "worsening": return "Declining";
+            default: return "Stable";
         }
     };
 
-    const getSeverityColor = (severity: string) => {
-        switch (severity) {
-            case "significant": return "bg-red-100 text-red-700";
-            case "moderate": return "bg-amber-100 text-amber-700";
-            default: return "bg-[#E8DED4] text-[#8B8178]";
+    const getPaceStyle = (pace: string) => {
+        switch (pace) {
+            case "fast": return "text-emerald-600 bg-emerald-500/10";
+            case "slow": return "text-amber-600 bg-amber-500/10";
+            default: return "text-[#5C6B4A] bg-[#5C6B4A]/8";
         }
+    };
+
+    const getSeverityStyle = (severity: string) => {
+        switch (severity) {
+            case "significant": return { dot: "bg-red-500", badge: "text-red-600 bg-red-500/10" };
+            case "moderate": return { dot: "bg-amber-500", badge: "text-amber-600 bg-amber-500/10" };
+            default: return { dot: "bg-[#8B8178]", badge: "text-[#8B8178] bg-[#8B8178]/10" };
+        }
+    };
+
+    const customTooltipStyle = {
+        background: "rgba(253,248,243,0.95)",
+        border: "1px solid rgba(232,222,212,0.6)",
+        borderRadius: "16px",
+        fontSize: "13px",
+        padding: "10px 14px",
+        backdropFilter: "blur(10px)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#FDF8F3] via-[#F5EDE4] to-[#E8DED4]">
-            {/* Background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-20 right-20 w-[400px] h-[400px] rounded-full bg-[#D4A574]/10 blur-3xl" />
-                <div className="absolute bottom-20 left-20 w-[300px] h-[300px] rounded-full bg-[#5C6B4A]/5 blur-3xl" />
+        <div className="min-h-screen bg-[#FDF8F3] relative overflow-hidden">
+            <div className="grain-overlay" />
+
+            <div className="fixed inset-0 pointer-events-none z-0" aria-hidden="true">
+                <div className="absolute -top-32 right-20 w-[600px] h-[600px] rounded-full bg-[#5C6B4A]/5 blur-[140px]" />
+                <div className="absolute bottom-10 -left-20 w-[500px] h-[500px] rounded-full bg-[#D4A574]/8 blur-[120px]" />
             </div>
 
             <div className="flex min-h-screen relative z-10">
-                {/* Sidebar */}
-                <aside className="w-64 p-6 flex flex-col fixed h-screen hidden md:flex">
-                    <div className="flex items-center gap-3 mb-12">
-                        <Logo size="md" />
+                {/* ═══ SIDEBAR ═══ */}
+                <aside className="w-72 flex-col fixed h-screen hidden md:flex bg-white/40 backdrop-blur-xl border-r border-[#E8DED4]/60">
+                    <div className="p-8 pb-0">
+                        <Link to="/" className="block mb-1">
+                            <span className="text-[#5C6B4A] font-extrabold text-xl tracking-tight uppercase" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.04em" }}>Synapse</span>
+                        </Link>
+                        <div className="flex items-center gap-2 mb-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+                            <span className="mono-tag text-[8px] text-[#8B8178]/50">Active Session</span>
+                        </div>
                     </div>
-
-                    <nav className="space-y-2 flex-1">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-500 ${
-                                    item.active
-                                        ? "bg-[#5C6B4A] text-[#FDF8F3]"
-                                        : "text-[#8B8178] hover:bg-[#E8DED4]/50 hover:text-[#3D3D3D]"
-                                }`}
-                            >
-                                <item.icon className="w-5 h-5" />
+                    <nav className="px-4 space-y-1 flex-1">
+                        {navItems.map((item, i) => (
+                            <Link key={item.path} to={item.path} className={`group flex items-center gap-3.5 px-5 py-3.5 rounded-2xl transition-all duration-500 relative ${item.active ? "bg-[#5C6B4A] text-white shadow-[0_10px_30px_rgba(92,107,74,0.25)]" : "text-[#8B8178] hover:bg-[#5C6B4A]/5 hover:text-[#3D3D3D]"}`}>
+                                <span className={`mono-tag text-[8px] ${item.active ? "text-white/30" : "text-[#8B8178]/30"}`}>0{i + 1}</span>
+                                <item.icon className="w-[18px] h-[18px]" />
                                 <span className="text-sm font-medium">{item.label}</span>
+                                {item.active && <div className="absolute right-4 w-1.5 h-1.5 rounded-full bg-white/60" />}
                             </Link>
                         ))}
                     </nav>
-
-                    <button
-                        onClick={() => { logout(); navigate("/"); }}
-                        className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all duration-500"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Sign Out</span>
-                    </button>
+                    <div className="p-4 space-y-2 mt-auto">
+                        {user && (
+                            <div className="px-5 py-4 rounded-2xl bg-[#5C6B4A]/5 border border-[#5C6B4A]/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center text-white text-sm font-bold">{(user.name || user.email)?.[0]?.toUpperCase()}</div>
+                                    <div className="min-w-0"><span className="text-sm text-[#3D3D3D] font-medium block truncate">{user.name || user.email}</span><span className="mono-tag text-[7px] text-[#8B8178]/50">Learner</span></div>
+                                </div>
+                            </div>
+                        )}
+                        <button onClick={() => { logout(); navigate("/"); }} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50/80 hover:text-red-500 transition-all duration-500 w-full">
+                            <LogOut className="w-[18px] h-[18px]" /><span className="text-sm font-medium">Sign Out</span>
+                        </button>
+                    </div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8 lg:p-12">
-                    <div className="max-w-5xl mx-auto space-y-8">
+                {/* ═══ MAIN ═══ */}
+                <main className="flex-1 ml-0 md:ml-72 pb-24 md:pb-0">
+                    <div className="max-w-5xl mx-auto px-6 md:px-10 lg:px-14 py-10 md:py-14 space-y-10">
+
                         {/* Header */}
-                        <motion.header
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <p className="text-sm text-[#8B8178] mb-2">Your learning</p>
-                            <h1 className="font-serif text-4xl lg:text-5xl text-[#3D3D3D]">Analytics</h1>
+                        <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease }}>
+                            <span className="mono-tag text-[10px] text-[#8B8178] mb-3 block">// Learning Metrics</span>
+                            <h1 className="text-[clamp(2.2rem,5vw,3.5rem)] font-black leading-[0.9] tracking-tight text-[#5C6B4A] uppercase" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.04em" }}>
+                                Analytics.
+                            </h1>
                         </motion.header>
 
                         {isLoading ? (
-                            <div className="flex items-center justify-center py-20">
-                                <Loader2 className="w-8 h-8 text-[#5C6B4A] animate-spin" />
-                            </div>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-4">
+                                <div className="w-14 h-14 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_10px_30px_rgba(92,107,74,0.2)]">
+                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                </div>
+                                <span className="mono-tag text-[10px] text-[#8B8178]">Loading analytics...</span>
+                            </motion.div>
+
                         ) : data ? (
                             <>
-                                {/* Summary Cards */}
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.6, delay: 0.1 }}
-                                    className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-                                >
-                                    <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-[#E8DED4]">
-                                        <div className="flex items-center gap-2 mb-3">
+                                {/* ──── Summary Cards ──── */}
+                                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.1, ease }}
+                                    className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                                    {/* Clarity */}
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                        <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#5C6B4A]/20 group-hover:bg-[#5C6B4A]/40 transition-colors" />
+                                        <div className="flex items-center gap-2 mb-4">
                                             <Brain className="w-4 h-4 text-[#5C6B4A]" />
-                                            <span className="text-xs uppercase tracking-wider text-[#8B8178]">Clarity</span>
+                                            <span className="mono-tag text-[8px] text-[#8B8178]">Clarity</span>
                                         </div>
-                                        <p className="font-serif text-3xl text-[#3D3D3D]">{data.summary.current_clarity}%</p>
-                                        <div className="flex items-center gap-1 mt-1">
+                                        <p className="text-4xl font-black text-[#3D3D3D] tracking-tight" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.03em" }}>
+                                            {data.summary.current_clarity}<span className="text-lg text-[#8B8178]/40">%</span>
+                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-2">
                                             {getTrendIcon(data.summary.current_trend)}
-                                            <span className="text-xs text-[#8B8178] capitalize">{data.summary.current_trend}</span>
+                                            <span className="text-[11px] text-[#8B8178]">{getTrendLabel(data.summary.current_trend)}</span>
                                         </div>
                                     </div>
 
-                                    <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-[#E8DED4]">
-                                        <div className="flex items-center gap-2 mb-3">
+                                    {/* Pace */}
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                        <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#D4A574]/20 group-hover:bg-[#D4A574]/40 transition-colors" />
+                                        <div className="flex items-center gap-2 mb-4">
                                             <Zap className="w-4 h-4 text-[#D4A574]" />
-                                            <span className="text-xs uppercase tracking-wider text-[#8B8178]">Pace</span>
+                                            <span className="mono-tag text-[8px] text-[#8B8178]">Pace</span>
                                         </div>
-                                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium capitalize ${getPaceColor(data.summary.learning_pace)}`}>
+                                        <span className={`inline-block px-3.5 py-1.5 rounded-full text-sm font-semibold capitalize ${getPaceStyle(data.summary.learning_pace)}`}>
                                             {data.summary.learning_pace}
                                         </span>
-                                        <p className="text-xs text-[#8B8178] mt-2 capitalize">{data.summary.stage} stage</p>
+                                        <p className="text-[11px] text-[#8B8178] mt-2.5 capitalize">{data.summary.stage} stage</p>
                                     </div>
 
-                                    <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-[#E8DED4]">
-                                        <div className="flex items-center gap-2 mb-3">
+                                    {/* Sessions */}
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                        <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#5C6B4A]/20 group-hover:bg-[#5C6B4A]/40 transition-colors" />
+                                        <div className="flex items-center gap-2 mb-4">
                                             <Activity className="w-4 h-4 text-[#5C6B4A]" />
-                                            <span className="text-xs uppercase tracking-wider text-[#8B8178]">Sessions</span>
+                                            <span className="mono-tag text-[8px] text-[#8B8178]">Sessions</span>
                                         </div>
-                                        <p className="font-serif text-3xl text-[#3D3D3D]">{data.summary.total_sessions}</p>
-                                        <p className="text-xs text-[#8B8178] mt-1">{data.summary.total_evaluations} evaluations</p>
+                                        <p className="text-4xl font-black text-[#3D3D3D] tracking-tight" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.03em" }}>
+                                            {data.summary.total_sessions}
+                                        </p>
+                                        <p className="text-[11px] text-[#8B8178] mt-2">{data.summary.total_evaluations} evaluations</p>
                                     </div>
 
-                                    <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-[#E8DED4]">
-                                        <div className="flex items-center gap-2 mb-3">
+                                    {/* Struggles */}
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                        <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-amber-400/20 group-hover:bg-amber-400/40 transition-colors" />
+                                        <div className="flex items-center gap-2 mb-4">
                                             <AlertTriangle className="w-4 h-4 text-amber-500" />
-                                            <span className="text-xs uppercase tracking-wider text-[#8B8178]">Struggles</span>
+                                            <span className="mono-tag text-[8px] text-[#8B8178]">Struggles</span>
                                         </div>
-                                        <p className="font-serif text-3xl text-[#3D3D3D]">{data.struggles.length}</p>
-                                        <p className="text-xs text-[#8B8178] mt-1">areas of difficulty</p>
+                                        <p className="text-4xl font-black text-[#3D3D3D] tracking-tight" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.03em" }}>
+                                            {data.struggles.length}
+                                        </p>
+                                        <p className="text-[11px] text-[#8B8178] mt-2">areas of difficulty</p>
                                     </div>
                                 </motion.div>
 
-                                {/* Clarity Trend Chart */}
+                                {/* ──── Clarity Trend Chart ──── */}
                                 {data.clarity_trend.length > 0 && (
-                                    <motion.section
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.6, delay: 0.2 }}
-                                        className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4]"
-                                    >
-                                        <h2 className="font-serif text-xl text-[#3D3D3D] mb-6">Clarity Over Time</h2>
+                                    <motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2, ease }}
+                                        className="relative rounded-[2rem] p-7 md:p-8 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]">
+                                        <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-[#5C6B4A]/20" />
+
+                                        <div className="flex items-center gap-2.5 mb-6">
+                                            <div className="w-8 h-8 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
+                                                <TrendingUp className="w-4 h-4 text-[#5C6B4A]" />
+                                            </div>
+                                            <span className="mono-tag text-[9px] text-[#8B8178]">Clarity Over Time</span>
+                                        </div>
+
                                         <ResponsiveContainer width="100%" height={280}>
                                             <AreaChart data={data.clarity_trend}>
                                                 <defs>
                                                     <linearGradient id="clarityGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#5C6B4A" stopOpacity={0.3} />
+                                                        <stop offset="5%" stopColor="#5C6B4A" stopOpacity={0.2} />
                                                         <stop offset="95%" stopColor="#5C6B4A" stopOpacity={0} />
                                                     </linearGradient>
                                                 </defs>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#E8DED4" />
-                                                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8B8178" }} />
-                                                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "#8B8178" }} />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        background: "#FDF8F3",
-                                                        border: "1px solid #E8DED4",
-                                                        borderRadius: "12px",
-                                                        fontSize: "13px",
-                                                    }}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="score"
-                                                    stroke="#5C6B4A"
-                                                    strokeWidth={2}
-                                                    fill="url(#clarityGradient)"
-                                                    dot={{ fill: "#5C6B4A", r: 4 }}
-                                                    activeDot={{ r: 6, fill: "#D4A574" }}
-                                                />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(232,222,212,0.5)" vertical={false} />
+                                                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#8B8178" }} axisLine={{ stroke: "rgba(232,222,212,0.5)" }} tickLine={false} />
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#8B8178" }} axisLine={false} tickLine={false} />
+                                                <Tooltip contentStyle={customTooltipStyle} />
+                                                <Area type="monotone" dataKey="score" stroke="#5C6B4A" strokeWidth={2.5} fill="url(#clarityGradient)"
+                                                    dot={{ fill: "#5C6B4A", r: 3, strokeWidth: 0 }}
+                                                    activeDot={{ r: 6, fill: "#D4A574", stroke: "#FDF8F3", strokeWidth: 2 }} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     </motion.section>
                                 )}
 
-                                {/* Session Activity Chart */}
-                                <motion.section
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.6, delay: 0.3 }}
-                                    className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4]"
-                                >
-                                    <h2 className="font-serif text-xl text-[#3D3D3D] mb-6">Session Activity (30 Days)</h2>
+                                {/* ──── Session Activity Chart ──── */}
+                                <motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3, ease }}
+                                    className="relative rounded-[2rem] p-7 md:p-8 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]">
+                                    <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-[#D4A574]/20" />
+
+                                    <div className="flex items-center gap-2.5 mb-6">
+                                        <div className="w-8 h-8 rounded-full bg-[#D4A574]/10 flex items-center justify-center">
+                                            <Activity className="w-4 h-4 text-[#D4A574]" />
+                                        </div>
+                                        <span className="mono-tag text-[9px] text-[#8B8178]">Session Activity</span>
+                                        <span className="mono-tag text-[8px] text-[#8B8178]/25 ml-auto">30 Days</span>
+                                    </div>
+
                                     <ResponsiveContainer width="100%" height={200}>
                                         <BarChart data={data.session_activity}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#E8DED4" />
-                                            <XAxis
-                                                dataKey="date"
-                                                tick={{ fontSize: 10, fill: "#8B8178" }}
-                                                tickFormatter={(val: string) => val.slice(5)}
-                                            />
-                                            <YAxis tick={{ fontSize: 11, fill: "#8B8178" }} allowDecimals={false} />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    background: "#FDF8F3",
-                                                    border: "1px solid #E8DED4",
-                                                    borderRadius: "12px",
-                                                    fontSize: "13px",
-                                                }}
-                                            />
-                                            <Bar dataKey="sessions" fill="#D4A574" radius={[4, 4, 0, 0]} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(232,222,212,0.5)" vertical={false} />
+                                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#8B8178" }} tickFormatter={(val: string) => val.slice(5)} axisLine={{ stroke: "rgba(232,222,212,0.5)" }} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 10, fill: "#8B8178" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                                            <Tooltip contentStyle={customTooltipStyle} />
+                                            <Bar dataKey="sessions" fill="#D4A574" radius={[6, 6, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </motion.section>
 
-                                {/* Struggles Table */}
+                                {/* ──── Struggles ──── */}
                                 {data.struggles.length > 0 && (
-                                    <motion.section
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.6, delay: 0.4 }}
-                                        className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4]"
-                                    >
-                                        <h2 className="font-serif text-xl text-[#3D3D3D] mb-6">Areas of Difficulty</h2>
-                                        <div className="space-y-3">
-                                            {data.struggles.map((s, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="flex items-center justify-between p-4 rounded-2xl bg-[#FDF8F3]/50 border border-[#E8DED4]"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-2 h-2 rounded-full bg-[#D4A574]" />
-                                                        <span className="text-[#3D3D3D] font-medium">{s.topic}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-xs text-[#8B8178]">{s.count}x encountered</span>
-                                                        <span className={`text-xs px-2 py-1 rounded-full ${getSeverityColor(s.severity)}`}>
-                                                            {s.severity}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    <motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4, ease }}
+                                        className="relative rounded-[2rem] p-7 md:p-8 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]">
+                                        <div className="flex items-center gap-2.5 mb-6">
+                                            <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                                                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <span className="mono-tag text-[9px] text-[#8B8178]">Areas of Difficulty</span>
+                                            <span className="mono-tag text-[8px] text-[#8B8178]/25 ml-auto">{data.struggles.length} topics</span>
+                                        </div>
+
+                                        <div className="space-y-2.5">
+                                            {data.struggles.map((s, idx) => {
+                                                const sev = getSeverityStyle(s.severity);
+                                                return (
+                                                    <motion.div key={idx} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ duration: 0.5, delay: 0.45 + idx * 0.06, ease }}
+                                                        className="group flex items-center justify-between p-4 rounded-xl bg-white/40 border border-[#E8DED4]/50 hover:bg-white/60 hover:-translate-y-0.5 transition-all duration-500">
+                                                        <div className="flex items-center gap-3.5">
+                                                            <div className={`w-2 h-2 rounded-full ${sev.dot}`} />
+                                                            <span className="text-[#3D3D3D] font-medium text-sm">{s.topic}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="mono-tag text-[8px] text-[#8B8178]/40">{s.count}× encountered</span>
+                                                            <span className={`mono-tag text-[8px] px-2.5 py-1 rounded-full ${sev.badge} capitalize`}>{s.severity}</span>
+                                                        </div>
+                                                    </motion.div>
+                                                );
+                                            })}
                                         </div>
                                     </motion.section>
                                 )}
                             </>
                         ) : (
-                            <motion.section
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4] text-center"
-                            >
-                                <BarChart3 className="w-12 h-12 text-[#5C6B4A] mx-auto mb-4" />
-                                <h2 className="font-serif text-xl text-[#3D3D3D] mb-2">No data yet</h2>
-                                <p className="text-[#8B8178] mb-6">Start a mentoring session to begin building your analytics.</p>
-                                <Link
-                                    to="/mentor"
-                                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#5C6B4A] text-[#FDF8F3] rounded-full font-medium hover:bg-[#4A5A3A] transition-all duration-500"
-                                >
-                                    Start a session <ChevronRight className="w-4 h-4" />
+                            /* Empty State */
+                            <motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease }}
+                                className="relative rounded-[2.5rem] p-14 text-center overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]">
+                                <div className="w-16 h-16 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center mx-auto mb-6">
+                                    <BarChart3 className="w-8 h-8 text-[#5C6B4A]" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-[#3D3D3D] mb-3 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>No data yet</h2>
+                                <p className="text-[#8B8178] mb-8 max-w-sm mx-auto text-sm">Start a mentoring session to begin building your analytics.</p>
+                                <Link to="/mentor" className="group inline-flex items-center gap-2 px-8 py-4 bg-[#5C6B4A] text-white rounded-full font-bold hover:bg-[#4A5A3A] hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(92,107,74,0.25)] transition-all duration-500">
+                                    Start a session <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                                 </Link>
                             </motion.section>
                         )}
 
-                        <motion.footer
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.6, delay: 0.5 }}
-                            className="text-center py-8"
-                        >
-                            <p className="text-sm text-[#8B8178]/50">
-                                Learning is not linear. These metrics guide, not define.
-                            </p>
+                        <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.6, ease }} className="py-6 flex items-center gap-3">
+                            <div className="w-8 h-px bg-[#E8DED4]" />
+                            <span className="mono-tag text-[9px] text-[#8B8178]/30">Learning is not linear — these metrics guide, not define</span>
                         </motion.footer>
                     </div>
                 </main>
+            </div>
+
+            {/* ═══ MOBILE BOTTOM NAV ═══ */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-t border-[#E8DED4]/50 px-2 py-2 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-around">
+                    {navItems.map((item) => (
+                        <Link key={item.path} to={item.path} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ${item.active ? "text-[#5C6B4A]" : "text-[#8B8178]/50"}`}>
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-[9px] font-medium">{item.label}</span>
+                            {item.active && <div className="w-1 h-1 rounded-full bg-[#5C6B4A]" />}
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );
