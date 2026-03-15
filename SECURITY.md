@@ -6,7 +6,7 @@ This document describes the security architecture implemented in the Synapse bac
 
 ## Security Overview
 
-Synapse implements a **defense-in-depth** security model across authentication, authorization, input validation, rate limiting, and transport security. All security features are production-grade and have been verified through:
+Synapse implements a **defense-in-depth** security model across authentication, authorization, input validation , rate limiting, and transport security. All security features are production-grade and have been verified through:
 
 - **Phase 1** — Engineering Hardening
 - **Phase 1.5** — Production Hardening
