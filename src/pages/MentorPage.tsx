@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, LogOut, History, Plus, X, Trash2 } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -163,6 +163,7 @@ export default function MentorPage() {
         { icon: Home, label: "Garden", path: "/dashboard" },
         { icon: MessageSquare, label: "Session", path: "/mentor", active: true },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile" },
     ];
 
@@ -176,7 +177,7 @@ export default function MentorPage() {
 
             <div className="flex min-h-screen relative z-10">
                 {/* Sidebar */}
-                <aside className="w-64 p-6 flex flex-col fixed h-screen">
+                <aside className="w-64 p-6 flex-col fixed h-screen hidden md:flex">
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-12">
                         <Logo size="md" />
@@ -209,7 +210,7 @@ export default function MentorPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 ml-64 flex flex-col">
+                <main className="flex-1 ml-0 md:ml-64 flex flex-col">
                     {/* Header */}
                     <header className="p-8 pb-4">
                         <div className="max-w-3xl mx-auto">

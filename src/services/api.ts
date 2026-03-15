@@ -177,6 +177,7 @@ export interface DashboardData {
             clarity_score: number;
             confusion_trend: string;
             understanding_delta: number;
+            understanding_trend?: string;
         };
     };
     effort: {
@@ -184,11 +185,15 @@ export interface DashboardData {
         consistency_streak: number;
         persistence_score: number;
         label: string;
+        persistence_label?: string;
+        sessions_this_week?: number;
+        note?: string;
     };
     next_bloom: {
         title: string;
         description: string;
         source: string;
+        action_hint?: string;
     };
     recent_signals: {
         observation: string;
@@ -289,6 +294,36 @@ export async function regenerateRoadmap(roadmapId: string): Promise<any> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/regenerate/${roadmapId}`, {
             method: 'POST',
+            credentials: 'include',
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+// Analytics API
+
+export interface AnalyticsData {
+    clarity_trend: { index: number; date: string; score: number }[];
+    confusion_trend: { index: number; date: string; trend: string }[];
+    session_activity: { date: string; sessions: number }[];
+    struggles: { topic: string; severity: string; count: number }[];
+    summary: {
+        current_clarity: number;
+        current_trend: string;
+        learning_pace: string;
+        stage: string;
+        total_sessions: number;
+        total_evaluations: number;
+        roadmap_regenerations: number;
+    };
+}
+
+export async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/analytics/learning`, {
             credentials: 'include',
         });
         if (!response.ok) return null;

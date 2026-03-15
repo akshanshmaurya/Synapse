@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Sprout, Sun, Droplets, Wind, Home, MessageSquare, Map, User, ChevronRight, LogOut, Loader2 } from "lucide-react";
+import { Leaf, Sprout, Sun, Droplets, Wind, Home, MessageSquare, Map, User, BarChart3, ChevronRight, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchDashboardData, DashboardData } from "@/services/api";
 import Logo from "@/components/Logo";
@@ -30,6 +30,7 @@ export default function DashboardPage() {
         { icon: Home, label: "Garden", path: "/dashboard", active: true },
         { icon: MessageSquare, label: "Session", path: "/mentor" },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile" },
     ];
 
@@ -84,7 +85,7 @@ export default function DashboardPage() {
 
             <div className="flex min-h-screen relative z-10">
                 {/* Sidebar */}
-                <aside className="w-64 p-6 flex flex-col fixed h-screen">
+                <aside className="w-64 p-6 flex-col fixed h-screen hidden md:flex">
                     <div className="flex items-center gap-3 mb-12">
                         <Logo size="md" />
                     </div>
@@ -115,7 +116,7 @@ export default function DashboardPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 ml-64 p-8 lg:p-12">
+                <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8 lg:p-12">
                     <div className="max-w-4xl mx-auto space-y-8">
                         {/* Header */}
                         <motion.header
