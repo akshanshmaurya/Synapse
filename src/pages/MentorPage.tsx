@@ -4,8 +4,12 @@ import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut,
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
-import Logo from "@/components/Logo";
 import CognitiveTracePanel from "@/components/CognitiveTracePanel";
+
+/* ──────────────────────────────────────────────
+   Animation Presets (Landing Page system)
+   ────────────────────────────────────────────── */
+const ease = [0.23, 1, 0.32, 1];
 
 interface Reflection {
     id: string;
@@ -15,7 +19,7 @@ interface Reflection {
 }
 
 export default function MentorPage() {
-    const { user, isAuthenticated, logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [input, setInput] = useState("");
     const [reflections, setReflections] = useState<Reflection[]>([
@@ -47,7 +51,6 @@ export default function MentorPage() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [reflections, isReflecting]);
 
-    // Load chat sessions when history panel opens
     useEffect(() => {
         if (showHistory) {
             loadChatSessions();
@@ -64,8 +67,6 @@ export default function MentorPage() {
     const handleSelectSession = async (session: ChatSession) => {
         setChatId(session._id);
         setShowHistory(false);
-
-        // Load messages from this session
         const messages = await fetchChatMessages(session._id);
         const loadedReflections: Reflection[] = messages.map((msg: ChatMessage) => ({
             id: msg._id,
@@ -73,7 +74,6 @@ export default function MentorPage() {
             content: msg.content,
             timestamp: new Date(msg.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
         }));
-
         if (loadedReflections.length > 0) {
             setReflections(loadedReflections);
         }
@@ -106,26 +106,20 @@ export default function MentorPage() {
 
     const handleSubmit = async () => {
         if (!input.trim()) return;
-
         const thought: Reflection = {
             id: Date.now().toString(),
             type: "thought",
             content: input,
             timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
         };
-
         setReflections(prev => [...prev, thought]);
         setInput("");
         setIsReflecting(true);
-
         try {
             const result = await sendMessage(thought.content, chatId || undefined);
-
-            // Track the chat_id from response
             if (result.chatId && !chatId) {
                 setChatId(result.chatId);
             }
-
             const guidance: Reflection = {
                 id: (Date.now() + 1).toString(),
                 type: "guidance",
@@ -133,13 +127,10 @@ export default function MentorPage() {
                 timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
             };
             setReflections(prev => [...prev, guidance]);
-
-            // Optional: play audio
             const audio = await streamAudio(result.response);
             if (audio) {
                 audio.play().catch(e => console.log("Auto-play prevented:", e));
             }
-
         } catch (error) {
             console.error("Session error", error);
             const errorGuidance: Reflection = {
@@ -168,133 +159,183 @@ export default function MentorPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#FDF8F3] via-[#F5EDE4] to-[#E8DED4]">
-            {/* Subtle background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-[#D4A574]/10 blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[#5C6B4A]/5 blur-3xl" />
+        <div className="min-h-screen bg-[#FDF8F3] relative overflow-hidden">
+            {/* Grain Texture */}
+            <div className="grain-overlay" />
+
+            {/* Ambient Glows */}
+            <div className="fixed inset-0 pointer-events-none z-0" aria-hidden="true">
+                <div className="absolute -top-40 right-10 w-[600px] h-[600px] rounded-full bg-[#5C6B4A]/5 blur-[140px]" />
+                <div className="absolute bottom-10 -left-20 w-[400px] h-[400px] rounded-full bg-[#D4A574]/8 blur-[110px]" />
             </div>
 
             <div className="flex min-h-screen relative z-10">
-                {/* Sidebar */}
-                <aside className="w-64 p-6 flex-col fixed h-screen hidden md:flex">
-                    {/* Logo */}
-                    <div className="flex items-center gap-3 mb-12">
-                        <Logo size="md" />
+
+                {/* ═══ SIDEBAR ═══ */}
+                <aside className="w-72 flex-col fixed h-screen hidden md:flex bg-white/40 backdrop-blur-xl border-r border-[#E8DED4]/60 z-30">
+                    <div className="p-8 pb-0">
+                        <Link to="/" className="block mb-1">
+                            <span
+                                className="text-[#5C6B4A] font-extrabold text-xl tracking-tight uppercase"
+                                style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.04em" }}
+                            >
+                                Synapse
+                            </span>
+                        </Link>
+                        <div className="flex items-center gap-2 mb-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+                            <span className="mono-tag text-[8px] text-[#8B8178]/50">Active Session</span>
+                        </div>
                     </div>
 
-                    {/* Nav */}
-                    <nav className="space-y-2 flex-1">
-                        {navItems.map((item) => (
+                    <nav className="px-4 space-y-1 flex-1">
+                        {navItems.map((item, i) => (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-500 ${item.active
-                                    ? "bg-[#5C6B4A] text-[#FDF8F3]"
-                                    : "text-[#8B8178] hover:bg-[#E8DED4]/50 hover:text-[#3D3D3D]"
-                                    }`}
+                                className={`group flex items-center gap-3.5 px-5 py-3.5 rounded-2xl transition-all duration-500 relative ${
+                                    item.active
+                                        ? "bg-[#5C6B4A] text-white shadow-[0_10px_30px_rgba(92,107,74,0.25)]"
+                                        : "text-[#8B8178] hover:bg-[#5C6B4A]/5 hover:text-[#3D3D3D]"
+                                }`}
                             >
-                                <item.icon className="w-5 h-5" />
+                                <span className={`mono-tag text-[8px] ${item.active ? "text-white/30" : "text-[#8B8178]/30"}`}>
+                                    0{i + 1}
+                                </span>
+                                <item.icon className="w-[18px] h-[18px]" />
                                 <span className="text-sm font-medium">{item.label}</span>
+                                {item.active && (
+                                    <div className="absolute right-4 w-1.5 h-1.5 rounded-full bg-white/60" />
+                                )}
                             </Link>
                         ))}
                     </nav>
 
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all duration-500"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Sign Out</span>
-                    </button>
-                </aside>
-
-                {/* Main Content */}
-                <main className="flex-1 ml-0 md:ml-64 flex flex-col">
-                    {/* Header */}
-                    <header className="p-8 pb-4">
-                        <div className="max-w-3xl mx-auto">
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6 }}
-                                className="flex items-center justify-between"
-                            >
+                    <div className="p-4 space-y-2 mt-auto">
+                        {user && (
+                            <div className="px-5 py-4 rounded-2xl bg-[#5C6B4A]/5 border border-[#5C6B4A]/10">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
-                                        <Leaf className="w-6 h-6 text-[#5C6B4A]" />
+                                    <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center text-white text-sm font-bold">
+                                        {(user.name || user.email)?.[0]?.toUpperCase()}
                                     </div>
-                                    <div>
-                                        <h1 className="font-serif text-2xl text-[#3D3D3D]">Nurturing Session</h1>
-                                        <p className="text-sm text-[#8B8178]">A space for reflection and growth</p>
+                                    <div className="min-w-0">
+                                        <span className="text-sm text-[#3D3D3D] font-medium block truncate">{user.name || user.email}</span>
+                                        <span className="mono-tag text-[7px] text-[#8B8178]/50">Learner</span>
                                     </div>
                                 </div>
+                            </div>
+                        )}
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50/80 hover:text-red-500 transition-all duration-500 w-full"
+                        >
+                            <LogOut className="w-[18px] h-[18px]" />
+                            <span className="text-sm font-medium">Sign Out</span>
+                        </button>
+                    </div>
+                </aside>
 
-                                {/* History Button */}
-                                <button
-                                    onClick={() => setShowHistory(!showHistory)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-[#E8DED4] text-[#8B8178] hover:bg-[#5C6B4A] hover:text-white transition-all duration-300"
+                {/* ═══ MAIN CHAT AREA ═══ */}
+                <main className="flex-1 ml-0 md:ml-72 flex flex-col h-screen">
+
+                    {/* ──── Top Bar ──── */}
+                    <motion.header
+                        initial={{ opacity: 0, y: -15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease }}
+                        className="px-6 md:px-10 py-5 flex items-center justify-between border-b border-[#E8DED4]/50 bg-white/30 backdrop-blur-xl sticky top-0 z-20"
+                    >
+                        <div className="flex items-center gap-4">
+                            {/* Mentor avatar */}
+                            <div className="relative">
+                                <div className="w-11 h-11 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_4px_15px_rgba(92,107,74,0.2)]">
+                                    <Leaf className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#FDF8F3] shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+                            </div>
+                            <div>
+                                <h1
+                                    className="text-lg font-bold text-[#3D3D3D] tracking-tight"
+                                    style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.02em" }}
                                 >
-                                    <History className="w-4 h-4" />
-                                    <span className="text-sm font-medium">History</span>
-                                </button>
-                            </motion.div>
+                                    Nurturing Session
+                                </h1>
+                                <span className="mono-tag text-[8px] text-[#8B8178]/50">// Active · AI Mentor</span>
+                            </div>
                         </div>
-                    </header>
 
-                    {/* History Panel */}
+                        {/* Actions */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleNewChat}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[#5C6B4A] bg-[#5C6B4A]/8 hover:bg-[#5C6B4A]/15 border border-[#5C6B4A]/15 transition-all duration-500 text-sm font-medium"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">New</span>
+                            </button>
+                            <button
+                                onClick={() => setShowHistory(!showHistory)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-500 text-sm font-medium border ${
+                                    showHistory
+                                        ? "bg-[#5C6B4A] text-white border-[#5C6B4A] shadow-[0_8px_20px_rgba(92,107,74,0.2)]"
+                                        : "text-[#8B8178] bg-white/50 border-[#E8DED4] hover:border-[#5C6B4A]/30 hover:text-[#5C6B4A]"
+                                }`}
+                            >
+                                <History className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">History</span>
+                            </button>
+                        </div>
+                    </motion.header>
+
+                    {/* ──── History Panel (Slide down) ──── */}
                     <AnimatePresence>
                         {showHistory && (
                             <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="px-8"
+                                transition={{ duration: 0.4, ease }}
+                                className="overflow-hidden border-b border-[#E8DED4]/50 bg-white/50 backdrop-blur-xl"
                             >
-                                <div className="max-w-3xl mx-auto bg-white/80 backdrop-blur-sm rounded-2xl border border-[#E8DED4] p-4 mb-4">
+                                <div className="max-w-3xl mx-auto px-6 md:px-10 py-5">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-serif text-lg text-[#3D3D3D]">Conversation History</h3>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleNewChat}
-                                                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#5C6B4A] text-white text-sm hover:bg-[#4A5A3A] transition-colors"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                                New Chat
-                                            </button>
-                                            <button
-                                                onClick={() => setShowHistory(false)}
-                                                className="p-1.5 rounded-full hover:bg-[#E8DED4] transition-colors"
-                                            >
-                                                <X className="w-4 h-4 text-[#8B8178]" />
-                                            </button>
-                                        </div>
+                                        <span className="mono-tag text-[9px] text-[#8B8178]">Conversation History</span>
+                                        <button
+                                            onClick={() => setShowHistory(false)}
+                                            className="p-1.5 rounded-full hover:bg-[#E8DED4]/50 text-[#8B8178] transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
                                     </div>
 
                                     {loadingHistory ? (
-                                        <p className="text-sm text-[#8B8178] text-center py-4">Loading...</p>
+                                        <div className="flex items-center gap-3 py-6 justify-center">
+                                            <span className="w-4 h-4 border-2 border-[#5C6B4A]/20 border-t-[#5C6B4A] rounded-full animate-spin" />
+                                            <span className="text-sm text-[#8B8178]">Loading...</span>
+                                        </div>
                                     ) : chatSessions.length === 0 ? (
-                                        <p className="text-sm text-[#8B8178] text-center py-4">No previous conversations</p>
+                                        <p className="text-sm text-[#8B8178]/60 text-center py-6">No previous conversations yet.</p>
                                     ) : (
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
                                             {chatSessions.map((session) => (
                                                 <div
                                                     key={session._id}
                                                     onClick={() => handleSelectSession(session)}
-                                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${chatId === session._id
-                                                        ? "bg-[#5C6B4A]/10 border border-[#5C6B4A]/30"
-                                                        : "hover:bg-[#E8DED4]/50"
-                                                        }`}
+                                                    className={`group flex items-center justify-between p-3.5 rounded-2xl cursor-pointer transition-all duration-500 ${
+                                                        chatId === session._id
+                                                            ? "bg-[#5C6B4A]/8 border border-[#5C6B4A]/20"
+                                                            : "hover:bg-[#E8DED4]/30 border border-transparent"
+                                                    }`}
                                                 >
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-medium text-sm text-[#3D3D3D] truncate">{session.title}</p>
-                                                        <p className="text-xs text-[#8B8178] truncate">{session.last_message_preview || "No messages"}</p>
+                                                        <p className="text-xs text-[#8B8178]/60 truncate">{session.last_message_preview || "No messages"}</p>
                                                     </div>
-                                                    <div className="flex items-center gap-2 ml-2">
-                                                        <span className="text-xs text-[#8B8178]">{session.message_count} msgs</span>
+                                                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                                                        <span className="mono-tag text-[8px] text-[#8B8178]/40">{session.message_count}</span>
                                                         <button
                                                             onClick={(e) => handleDeleteSession(e, session._id)}
-                                                            className="p-1 rounded hover:bg-red-100 text-[#8B8178] hover:text-red-500 transition-colors"
+                                                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 text-[#8B8178] hover:text-red-500 transition-all"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -308,69 +349,88 @@ export default function MentorPage() {
                         )}
                     </AnimatePresence>
 
-                    {/* Reflections Area */}
-                    <div className="flex-1 overflow-y-auto px-8 py-4">
-                        <div className="max-w-3xl mx-auto space-y-8">
+                    {/* ──── Chat / Reflections Area ──── */}
+                    <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8">
+                        <div className="max-w-3xl mx-auto space-y-6">
                             <AnimatePresence>
                                 {reflections.map((reflection, idx) => (
                                     <motion.div
                                         key={reflection.id}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.6, delay: idx === 0 ? 0.3 : 0 }}
-                                        className={reflection.type === "guidance" ? "" : "pl-12"}
+                                        transition={{ duration: 0.6, delay: idx === 0 ? 0.3 : 0, ease }}
+                                        className={reflection.type === "thought" ? "flex justify-end" : ""}
                                     >
                                         {reflection.type === "guidance" ? (
-                                            /* Guidance - Mentor's words */
-                                            <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4] shadow-sm">
-                                                <div className="flex items-start gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-[#5C6B4A]/10 flex-shrink-0 flex items-center justify-center">
-                                                        <Leaf className="w-5 h-5 text-[#5C6B4A]" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className="font-serif text-lg text-[#3D3D3D] leading-relaxed whitespace-pre-wrap">
+                                            /* ── Mentor Bubble ── */
+                                            <div className="flex items-start gap-4 max-w-[90%]">
+                                                {/* Avatar */}
+                                                <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center shrink-0 mt-1 shadow-[0_4px_12px_rgba(92,107,74,0.15)]">
+                                                    <Leaf className="w-4 h-4 text-white" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="bg-white/60 backdrop-blur-[30px] rounded-[1.5rem] rounded-tl-lg p-6 border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_10px_30px_-5px_rgba(0,0,0,0.04)]">
+                                                        <p className="text-[#3D3D3D] leading-[1.8] whitespace-pre-wrap text-[15px]">
                                                             {reflection.content}
                                                         </p>
-                                                        <div className="flex items-center gap-4 mt-6 pt-4 border-t border-[#E8DED4]">
-                                                            <button className="flex items-center gap-2 text-sm text-[#8B8178] hover:text-[#5C6B4A] transition-colors duration-500">
-                                                                <Volume2 className="w-4 h-4" />
-                                                                <span>Listen to this guidance</span>
-                                                            </button>
-                                                            <span className="text-xs text-[#8B8178]/50">{reflection.timestamp}</span>
-                                                        </div>
+                                                    </div>
+                                                    {/* Actions below bubble */}
+                                                    <div className="flex items-center gap-4 mt-2.5 px-2">
+                                                        <button className="flex items-center gap-1.5 text-[#8B8178]/40 hover:text-[#5C6B4A] transition-colors duration-500 group">
+                                                            <Volume2 className="w-3.5 h-3.5" />
+                                                            <span className="text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Listen</span>
+                                                        </button>
+                                                        <span className="mono-tag text-[8px] text-[#8B8178]/25">{reflection.timestamp}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         ) : (
-                                            /* Thought - User's words */
-                                            <div className="py-4">
-                                                <p className="text-[#3D3D3D]/80 leading-relaxed whitespace-pre-wrap">
-                                                    {reflection.content}
-                                                </p>
-                                                <span className="text-xs text-[#8B8178]/50 mt-2 block">{reflection.timestamp}</span>
+                                            /* ── User Bubble ── */
+                                            <div className="max-w-[85%]">
+                                                <div className="bg-[#5C6B4A] rounded-[1.5rem] rounded-tr-lg px-6 py-4 shadow-[0_8px_25px_rgba(92,107,74,0.2)]">
+                                                    <p className="text-white/90 leading-[1.7] whitespace-pre-wrap text-[15px]">
+                                                        {reflection.content}
+                                                    </p>
+                                                </div>
+                                                <div className="flex justify-end mt-2 px-2">
+                                                    <span className="mono-tag text-[8px] text-[#8B8178]/25">{reflection.timestamp}</span>
+                                                </div>
                                             </div>
                                         )}
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
 
+                            {/* Thinking indicator */}
                             {isReflecting && (
                                 <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.5 }}
-                                    className="bg-white/40 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4]"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.4, ease }}
+                                    className="flex items-start gap-4"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
-                                            <motion.div
-                                                animate={{ scale: [1, 1.2, 1] }}
-                                                transition={{ duration: 2, repeat: Infinity }}
-                                            >
-                                                <Leaf className="w-5 h-5 text-[#5C6B4A]" />
-                                            </motion.div>
+                                    <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center shrink-0 mt-1 shadow-[0_4px_12px_rgba(92,107,74,0.15)]">
+                                        <motion.div
+                                            animate={{ rotate: 360 }}
+                                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                        >
+                                            <Leaf className="w-4 h-4 text-white" />
+                                        </motion.div>
+                                    </div>
+                                    <div className="bg-white/50 backdrop-blur-[20px] rounded-[1.5rem] rounded-tl-lg px-6 py-5 border border-white/60 shadow-[inset_0_0_20px_rgba(255,255,255,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex gap-1.5">
+                                                {[0, 0.2, 0.4].map((delay) => (
+                                                    <motion.div
+                                                        key={delay}
+                                                        className="w-2 h-2 rounded-full bg-[#5C6B4A]/40"
+                                                        animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
+                                                        transition={{ duration: 1, repeat: Infinity, delay }}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <span className="text-sm text-[#8B8178]/50 ml-2 italic">Reflecting...</span>
                                         </div>
-                                        <span className="text-[#8B8178] font-serif italic">Reflecting on your thoughts...</span>
                                     </div>
                                 </motion.div>
                             )}
@@ -378,22 +438,23 @@ export default function MentorPage() {
                         </div>
                     </div>
 
-                    {/* Journal Input Area */}
-                    <div className="p-8 pt-4">
+                    {/* ──── Input Area ──── */}
+                    <div className="px-6 md:px-10 py-5 border-t border-[#E8DED4]/50 bg-white/30 backdrop-blur-xl">
                         <div className="max-w-3xl mx-auto">
                             <motion.div
-                                initial={{ opacity: 0, y: 20 }}
+                                initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6, delay: 0.5 }}
-                                className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-[#E8DED4] shadow-sm"
+                                transition={{ duration: 0.6, delay: 0.4, ease }}
+                                className="relative bg-white/60 backdrop-blur-[30px] rounded-2xl border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_10px_30px_-5px_rgba(0,0,0,0.04)] transition-shadow duration-500 focus-within:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_15px_40px_-10px_rgba(92,107,74,0.1)]"
                             >
                                 <textarea
                                     ref={textareaRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder="Share what's on your mind..."
-                                    className="w-full bg-transparent border-none focus:ring-0 resize-none text-lg text-[#3D3D3D] placeholder:text-[#8B8178]/50 font-light leading-relaxed"
-                                    rows={3}
+                                    className="w-full bg-transparent px-6 pt-5 pb-2 focus:outline-none resize-none text-[15px] text-[#3D3D3D] placeholder:text-[#8B8178]/35 leading-relaxed"
+                                    style={{ fontFamily: "'Inter', sans-serif" }}
+                                    rows={2}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" && !e.shiftKey) {
                                             e.preventDefault();
@@ -401,18 +462,21 @@ export default function MentorPage() {
                                         }
                                     }}
                                 />
-                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E8DED4]">
-                                    <p className="text-xs text-[#8B8178]/50">Press Enter to share, Shift+Enter for new line</p>
+                                <div className="flex items-center justify-between px-5 pb-4">
+                                    <span className="mono-tag text-[8px] text-[#8B8178]/25">
+                                        Enter to send · Shift+Enter for new line
+                                    </span>
                                     <button
                                         onClick={handleSubmit}
                                         disabled={!input.trim() || isReflecting}
-                                        className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-500 ${input.trim() && !isReflecting
-                                            ? "bg-[#5C6B4A] text-[#FDF8F3] hover:bg-[#4A5A3A]"
-                                            : "bg-[#E8DED4] text-[#8B8178]"
-                                            }`}
+                                        className={`group flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-500 ${
+                                            input.trim() && !isReflecting
+                                                ? "bg-[#5C6B4A] text-white hover:bg-[#4A5A3A] hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(92,107,74,0.2)]"
+                                                : "bg-[#E8DED4]/50 text-[#8B8178]/40 cursor-not-allowed"
+                                        }`}
                                     >
-                                        <span className="text-sm font-medium">Share</span>
-                                        <Send className="w-4 h-4" />
+                                        <span className="text-sm font-semibold">Share</span>
+                                        <Send className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                                     </button>
                                 </div>
                             </motion.div>
@@ -420,8 +484,28 @@ export default function MentorPage() {
                     </div>
                 </main>
             </div>
+
+            {/* Cognitive Trace Panel */}
             <CognitiveTracePanel />
+
+            {/* ═══ MOBILE BOTTOM NAV ═══ */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-t border-[#E8DED4]/50 px-2 py-2 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-around">
+                    {navItems.map((item) => (
+                        <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ${
+                                item.active ? "text-[#5C6B4A]" : "text-[#8B8178]/50"
+                            }`}
+                        >
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-[9px] font-medium">{item.label}</span>
+                            {item.active && <div className="w-1 h-1 rounded-full bg-[#5C6B4A]" />}
+                        </Link>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
-
