@@ -1,9 +1,10 @@
 ---
 name: Feature request
 about: Suggest an idea for Synapse
-title: '[FEATURE] '
+title: "[FEATURE] "
 labels: enhancement
 assignees: ''
+
 ---
 
 **Problem Description**
