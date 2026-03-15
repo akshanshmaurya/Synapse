@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Sprout, Home, MessageSquare, Map, User, BarChart3, Shield, Edit3, X, Plus, Check, LogOut, Loader2 } from "lucide-react";
+import { Leaf, Sprout, Home, MessageSquare, Map, User, BarChart3, Shield, Edit3, X, Plus, Check, LogOut, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchUserMemory, updateUserProfile } from "@/services/api";
-import Logo from "@/components/Logo";
+
+/* ──────────────────────────────────────────────
+   Animation Presets (Landing Page system)
+   ────────────────────────────────────────────── */
+const ease = [0.23, 1, 0.32, 1];
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
@@ -14,15 +18,12 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Editable fields
     const [interests, setInterests] = useState<string[]>([]);
     const [goals, setGoals] = useState<string[]>([]);
     const [newInterest, setNewInterest] = useState("");
     const [newGoal, setNewGoal] = useState("");
 
-    useEffect(() => {
-        loadProfile();
-    }, []);
+    useEffect(() => { loadProfile(); }, []);
 
     const loadProfile = async () => {
         try {
@@ -58,26 +59,15 @@ export default function ProfilePage() {
             setNewInterest("");
         }
     };
-
-    const removeInterest = (interest: string) => {
-        setInterests(interests.filter(i => i !== interest));
-    };
-
+    const removeInterest = (interest: string) => setInterests(interests.filter(i => i !== interest));
     const addGoal = () => {
         if (newGoal.trim() && !goals.includes(newGoal.trim())) {
             setGoals([...goals, newGoal.trim()]);
             setNewGoal("");
         }
     };
-
-    const removeGoal = (goal: string) => {
-        setGoals(goals.filter(g => g !== goal));
-    };
-
-    const handleLogout = () => {
-        logout();
-        navigate("/");
-    };
+    const removeGoal = (goal: string) => setGoals(goals.filter(g => g !== goal));
+    const handleLogout = () => { logout(); navigate("/"); };
 
     const navItems = [
         { icon: Home, label: "Garden", path: "/dashboard" },
@@ -91,204 +81,287 @@ export default function ProfilePage() {
     const learningPace = userMemory?.profile?.learning_pace || "moderate";
     const onboarding = userMemory?.onboarding || {};
 
+    /* ─── Loading ─── */
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-[#FDF8F3] via-[#F5EDE4] to-[#E8DED4] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-[#5C6B4A] animate-spin" />
+            <div className="min-h-screen bg-[#FDF8F3] flex items-center justify-center relative">
+                <div className="grain-overlay" />
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
+                    <div className="w-14 h-14 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_10px_30px_rgba(92,107,74,0.2)]">
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    </div>
+                    <span className="mono-tag text-[10px] text-[#8B8178]">Loading your roots...</span>
+                </motion.div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#FDF8F3] via-[#F5EDE4] to-[#E8DED4]">
-            {/* Subtle background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-40 right-20 w-[350px] h-[350px] rounded-full bg-[#D4A574]/10 blur-3xl" />
-                <div className="absolute bottom-40 left-10 w-[250px] h-[250px] rounded-full bg-[#5C6B4A]/5 blur-3xl" />
+        <div className="min-h-screen bg-[#FDF8F3] relative overflow-hidden">
+            {/* Grain */}
+            <div className="grain-overlay" />
+
+            {/* Ambient Glows */}
+            <div className="fixed inset-0 pointer-events-none z-0" aria-hidden="true">
+                <div className="absolute -top-32 right-10 w-[600px] h-[600px] rounded-full bg-[#5C6B4A]/6 blur-[140px]" />
+                <div className="absolute bottom-20 -left-32 w-[500px] h-[500px] rounded-full bg-[#D4A574]/8 blur-[120px]" />
             </div>
 
             <div className="flex min-h-screen relative z-10">
-                {/* Sidebar */}
-                <aside className="w-64 p-6 flex-col fixed h-screen hidden md:flex">
-                    <div className="flex items-center gap-3 mb-12">
-                        <Logo size="md" />
+
+                {/* ═══ SIDEBAR ═══ */}
+                <aside className="w-72 flex-col fixed h-screen hidden md:flex bg-white/40 backdrop-blur-xl border-r border-[#E8DED4]/60">
+                    <div className="p-8 pb-0">
+                        <Link to="/" className="block mb-1">
+                            <span className="text-[#5C6B4A] font-extrabold text-xl tracking-tight uppercase" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.04em" }}>
+                                Synapse
+                            </span>
+                        </Link>
+                        <div className="flex items-center gap-2 mb-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+                            <span className="mono-tag text-[8px] text-[#8B8178]/50">Active Session</span>
+                        </div>
                     </div>
 
-                    <nav className="space-y-2 flex-1">
-                        {navItems.map((item) => (
+                    <nav className="px-4 space-y-1 flex-1">
+                        {navItems.map((item, i) => (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-500 ${item.active
-                                    ? "bg-[#5C6B4A] text-[#FDF8F3]"
-                                    : "text-[#8B8178] hover:bg-[#E8DED4]/50 hover:text-[#3D3D3D]"
-                                    }`}
+                                className={`group flex items-center gap-3.5 px-5 py-3.5 rounded-2xl transition-all duration-500 relative ${
+                                    item.active
+                                        ? "bg-[#5C6B4A] text-white shadow-[0_10px_30px_rgba(92,107,74,0.25)]"
+                                        : "text-[#8B8178] hover:bg-[#5C6B4A]/5 hover:text-[#3D3D3D]"
+                                }`}
                             >
-                                <item.icon className="w-5 h-5" />
+                                <span className={`mono-tag text-[8px] ${item.active ? "text-white/30" : "text-[#8B8178]/30"}`}>0{i + 1}</span>
+                                <item.icon className="w-[18px] h-[18px]" />
                                 <span className="text-sm font-medium">{item.label}</span>
+                                {item.active && <div className="absolute right-4 w-1.5 h-1.5 rounded-full bg-white/60" />}
                             </Link>
                         ))}
                     </nav>
 
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[#8B8178] hover:bg-[#E8DED4]/50 transition-all duration-500"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Sign Out</span>
-                    </button>
+                    <div className="p-4 space-y-2 mt-auto">
+                        {user && (
+                            <div className="px-5 py-4 rounded-2xl bg-[#5C6B4A]/5 border border-[#5C6B4A]/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center text-white text-sm font-bold">{(user.name || user.email)?.[0]?.toUpperCase()}</div>
+                                    <div className="min-w-0">
+                                        <span className="text-sm text-[#3D3D3D] font-medium block truncate">{user.name || user.email}</span>
+                                        <span className="mono-tag text-[7px] text-[#8B8178]/50">Learner</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <button onClick={handleLogout} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50/80 hover:text-red-500 transition-all duration-500 w-full">
+                            <LogOut className="w-[18px] h-[18px]" />
+                            <span className="text-sm font-medium">Sign Out</span>
+                        </button>
+                    </div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8 lg:p-12">
-                    <div className="max-w-3xl mx-auto space-y-12">
+                {/* ═══ MAIN CONTENT ═══ */}
+                <main className="flex-1 ml-0 md:ml-72 pb-24 md:pb-0">
+                    <div className="max-w-4xl mx-auto px-6 md:px-10 lg:px-14 py-10 md:py-14 space-y-10">
+
                         {/* Header */}
                         <motion.header
-                            initial={{ opacity: 0, y: -10 }}
+                            initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
+                            transition={{ duration: 0.9, ease }}
+                            className="flex flex-col md:flex-row md:items-end md:justify-between gap-6"
                         >
-                            <h1 className="font-serif text-4xl lg:text-5xl text-[#3D3D3D] mb-4">Your Roots</h1>
-                            <p className="text-lg text-[#8B8178] leading-relaxed max-w-xl">
-                                The foundations of who you are becoming.
-                                These are not fixed — they deepen and branch as you grow.
-                            </p>
+                            <div>
+                                <span className="mono-tag text-[10px] text-[#8B8178] mb-3 block">// Your Roots</span>
+                                <h1
+                                    className="text-[clamp(2.2rem,5vw,3.5rem)] font-black leading-[0.9] tracking-tight text-[#5C6B4A] uppercase"
+                                    style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.04em" }}
+                                >
+                                    Profile.
+                                </h1>
+                                <p className="text-[#8B8178] text-base mt-3 max-w-md leading-relaxed">
+                                    The foundations of who you are becoming. These are not fixed — they deepen and branch as you grow.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => setIsEditing(!isEditing)}
+                                className={`group flex items-center gap-2.5 px-6 py-3 rounded-full font-semibold text-sm transition-all duration-500 w-fit ${
+                                    isEditing
+                                        ? "bg-[#E8DED4]/50 text-[#8B8178] hover:bg-[#E8DED4]"
+                                        : "bg-[#5C6B4A] text-white hover:bg-[#4A5A3A] hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(92,107,74,0.2)]"
+                                }`}
+                            >
+                                {isEditing ? <X className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                                {isEditing ? "Cancel" : "Edit Profile"}
+                            </button>
                         </motion.header>
 
-                        {/* Identity Card */}
+                        {/* ──── Hero Identity Card (Dark Green) ──── */}
                         <motion.section
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.1 }}
-                            className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-[#E8DED4]"
+                            transition={{ duration: 0.9, delay: 0.1, ease }}
+                            className="relative rounded-[2.5rem] overflow-hidden"
                         >
-                            <div className="flex items-start justify-between mb-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#D4A574] to-[#5C6B4A] flex items-center justify-center text-white text-2xl font-serif">
+                            <div className="absolute inset-0 bg-[#4A5A3A]" />
+                            <div
+                                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                                    mixBlendMode: "multiply",
+                                }}
+                            />
+                            <div className="absolute -top-20 -right-20 w-[300px] h-[300px] rounded-full bg-white/5 blur-[80px]" />
+
+                            <div className="relative z-10 p-8 md:p-12">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                                    {/* Avatar */}
+                                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-[#D4A574] to-[#8B8178] flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-[0_10px_30px_rgba(0,0,0,0.15)] ring-4 ring-white/10"
+                                         style={{ fontFamily: "'Inter', sans-serif" }}>
                                         {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "G"}
                                     </div>
                                     <div>
-                                        <h2 className="font-serif text-2xl text-[#3D3D3D]">{user?.name || "Growing Soul"}</h2>
-                                        <p className="text-[#8B8178]">{user?.email}</p>
+                                        <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight" style={{ fontFamily: "'Inter', sans-serif", letterSpacing: "-0.02em" }}>
+                                            {user?.name || "Growing Soul"}
+                                        </h2>
+                                        <span className="text-white/40 text-sm">{user?.email}</span>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsEditing(!isEditing)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-full text-[#8B8178] hover:bg-[#E8DED4]/50 transition-all duration-500"
-                                >
-                                    {isEditing ? <X className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
-                                    <span className="text-sm">{isEditing ? "Cancel" : "Edit"}</span>
-                                </button>
-                            </div>
 
-                            <div className="grid grid-cols-3 gap-4 border-t border-[#E8DED4] pt-6">
-                                <div>
-                                    <p className="text-xs uppercase tracking-wider text-[#8B8178] mb-1">Stage</p>
-                                    <p className="font-medium text-[#3D3D3D] capitalize">{stage}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs uppercase tracking-wider text-[#8B8178] mb-1">Pace</p>
-                                    <p className="font-medium text-[#3D3D3D] capitalize">{learningPace}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs uppercase tracking-wider text-[#8B8178] mb-1">Style</p>
-                                    <p className="font-medium text-[#3D3D3D] capitalize">{onboarding.mentoring_style || "supportive"}</p>
+                                {/* Stats Row */}
+                                <div className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-white/8">
+                                    {[
+                                        { label: "Stage", value: stage },
+                                        { label: "Pace", value: learningPace },
+                                        { label: "Style", value: onboarding.mentoring_style || "supportive" },
+                                    ].map((stat) => (
+                                        <div key={stat.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white/8 border border-white/10 backdrop-blur-sm">
+                                            <span className="mono-tag text-[9px] text-white/35">{stat.label}</span>
+                                            <span className="text-[13px] text-white font-semibold capitalize">{stat.value}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </motion.section>
 
-                        {/* Interests Section */}
+                        {/* ──── Interests ──── */}
                         <motion.section
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 25 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.2 }}
+                            transition={{ duration: 0.8, delay: 0.2, ease }}
+                            className="relative group rounded-[2rem] p-7 md:p-8 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]"
                         >
-                            <div className="flex items-center gap-2 mb-6">
-                                <Leaf className="w-5 h-5 text-[#5C6B4A]" />
-                                <h3 className="font-serif text-xl text-[#3D3D3D]">Interests</h3>
+                            <div className="absolute top-5 right-5 w-2 h-2 rounded-full bg-[#5C6B4A]/20" />
+
+                            <div className="flex items-center gap-2.5 mb-6">
+                                <div className="w-8 h-8 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
+                                    <Leaf className="w-4 h-4 text-[#5C6B4A]" />
+                                </div>
+                                <span className="mono-tag text-[9px] text-[#8B8178]">Interests</span>
+                                <span className="mono-tag text-[8px] text-[#8B8178]/25 ml-auto">{interests.length} items</span>
                             </div>
 
-                            <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-6 border border-[#E8DED4]">
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {interests.length === 0 ? (
-                                        <p className="text-[#8B8178]">No interests yet. Add some!</p>
-                                    ) : (
-                                        interests.map((interest, idx) => (
-                                            <span
-                                                key={idx}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5C6B4A]/10 text-[#5C6B4A]"
-                                            >
-                                                {interest}
-                                                {isEditing && (
-                                                    <button onClick={() => removeInterest(interest)}>
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                )}
-                                            </span>
-                                        ))
-                                    )}
-                                </div>
-
-                                <AnimatePresence>
-                                    {isEditing && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: "auto" }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            className="flex gap-2"
+                            <div className="flex flex-wrap gap-2.5 mb-5">
+                                {interests.length === 0 ? (
+                                    <p className="text-[#8B8178]/60 text-sm italic">No interests yet. Click edit to add some!</p>
+                                ) : (
+                                    interests.map((interest, idx) => (
+                                        <motion.span
+                                            key={idx}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ duration: 0.4, delay: idx * 0.04, ease }}
+                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                                                isEditing
+                                                    ? "bg-[#5C6B4A]/10 text-[#5C6B4A] border border-[#5C6B4A]/15 pr-3"
+                                                    : "bg-[#5C6B4A]/8 text-[#5C6B4A]"
+                                            }`}
                                         >
-                                            <input
-                                                type="text"
-                                                value={newInterest}
-                                                onChange={(e) => setNewInterest(e.target.value)}
-                                                onKeyPress={(e) => e.key === "Enter" && addInterest()}
-                                                placeholder="Add an interest..."
-                                                className="flex-1 px-4 py-2 bg-[#FDF8F3] border border-[#E8DED4] rounded-full text-[#3D3D3D] placeholder:text-[#8B8178]/50 focus:ring-2 focus:ring-[#5C6B4A]/20"
-                                            />
-                                            <button
-                                                onClick={addInterest}
-                                                className="p-2 rounded-full bg-[#5C6B4A] text-[#FDF8F3]"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                            {interest}
+                                            {isEditing && (
+                                                <button onClick={() => removeInterest(interest)} className="ml-1 p-0.5 rounded-full hover:bg-[#5C6B4A]/15 transition-colors">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </motion.span>
+                                    ))
+                                )}
                             </div>
+
+                            <AnimatePresence>
+                                {isEditing && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.3, ease }}
+                                        className="flex gap-2 pt-4 border-t border-[#E8DED4]/50"
+                                    >
+                                        <input
+                                            type="text"
+                                            value={newInterest}
+                                            onChange={(e) => setNewInterest(e.target.value)}
+                                            onKeyDown={(e) => e.key === "Enter" && addInterest()}
+                                            placeholder="Add an interest..."
+                                            className="flex-1 px-5 py-3 bg-white/60 border border-[#E8DED4] rounded-full text-[#3D3D3D] text-sm placeholder:text-[#8B8178]/40 focus:outline-none focus:ring-2 focus:ring-[#5C6B4A]/15 focus:border-[#5C6B4A]/25 transition-all duration-500 backdrop-blur-sm"
+                                            style={{ fontFamily: "'Inter', sans-serif" }}
+                                        />
+                                        <button
+                                            onClick={addInterest}
+                                            className="w-11 h-11 rounded-full bg-[#5C6B4A] text-white flex items-center justify-center hover:bg-[#4A5A3A] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(92,107,74,0.2)] transition-all duration-500 shrink-0"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.section>
 
-                        {/* Goals Section */}
+                        {/* ──── Aspirations / Goals ──── */}
                         <motion.section
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 25 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.3 }}
+                            transition={{ duration: 0.8, delay: 0.3, ease }}
+                            className="relative group rounded-[2rem] overflow-hidden"
                         >
-                            <div className="flex items-center gap-2 mb-6">
-                                <Sprout className="w-5 h-5 text-[#5C6B4A]" />
-                                <h3 className="font-serif text-xl text-[#3D3D3D]">Aspirations</h3>
-                            </div>
+                            {/* Green tint bg */}
+                            <div className="absolute inset-0 bg-[#5C6B4A]/[0.04] rounded-[2rem]" />
+                            <div className="absolute inset-0 border border-[#5C6B4A]/10 rounded-[2rem]" />
 
-                            <div className="bg-[#5C6B4A]/5 rounded-3xl p-8 border border-[#5C6B4A]/10">
-                                <p className="text-[#8B8178] mb-6">Where you hope your growth will lead:</p>
-                                <div className="space-y-4">
+                            <div className="relative z-10 p-7 md:p-8">
+                                <div className="flex items-center gap-2.5 mb-2">
+                                    <div className="w-8 h-8 rounded-full bg-[#D4A574]/15 flex items-center justify-center">
+                                        <Sprout className="w-4 h-4 text-[#D4A574]" />
+                                    </div>
+                                    <span className="mono-tag text-[9px] text-[#8B8178]">Aspirations</span>
+                                </div>
+                                <p className="text-[#8B8178]/60 text-sm mb-6 ml-[42px]">Where you hope your growth will lead.</p>
+
+                                <div className="space-y-3">
                                     {goals.length === 0 ? (
-                                        <p className="text-[#8B8178]">No goals yet. Add your aspirations!</p>
+                                        <p className="text-[#8B8178]/60 text-sm italic ml-[42px]">No goals yet. Click edit to add your aspirations!</p>
                                     ) : (
                                         goals.map((goal, idx) => (
-                                            <div key={idx} className="flex items-center gap-3 justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-2 h-2 rounded-full bg-[#D4A574]" />
-                                                    <span className="font-serif text-lg text-[#3D3D3D]">{goal}</span>
+                                            <motion.div
+                                                key={idx}
+                                                initial={{ opacity: 0, x: -15 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ duration: 0.5, delay: 0.1 + idx * 0.06, ease }}
+                                                className="flex items-center gap-4 group/goal py-3 px-4 rounded-xl hover:bg-white/40 transition-all duration-300"
+                                            >
+                                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                    <span className="mono-tag text-[8px] text-[#8B8178]/30 shrink-0">0{idx + 1}</span>
+                                                    <div className="w-2 h-2 rounded-full bg-[#D4A574] shrink-0" />
+                                                    <span className="text-[#3D3D3D] text-base font-medium">{goal}</span>
                                                 </div>
                                                 {isEditing && (
-                                                    <button
-                                                        onClick={() => removeGoal(goal)}
-                                                        className="p-1 text-[#8B8178] hover:text-[#3D3D3D]"
-                                                    >
-                                                        <X className="w-4 h-4" />
+                                                    <button onClick={() => removeGoal(goal)} className="p-1.5 rounded-lg text-[#8B8178] hover:bg-red-50 hover:text-red-500 transition-all opacity-0 group-hover/goal:opacity-100">
+                                                        <X className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
-                                            </div>
+                                            </motion.div>
                                         ))
                                     )}
                                 </div>
@@ -299,21 +372,23 @@ export default function ProfilePage() {
                                             initial={{ opacity: 0, height: 0 }}
                                             animate={{ opacity: 1, height: "auto" }}
                                             exit={{ opacity: 0, height: 0 }}
-                                            className="flex gap-2 mt-4"
+                                            transition={{ duration: 0.3, ease }}
+                                            className="flex gap-2 mt-4 pt-4 border-t border-[#5C6B4A]/10"
                                         >
                                             <input
                                                 type="text"
                                                 value={newGoal}
                                                 onChange={(e) => setNewGoal(e.target.value)}
-                                                onKeyPress={(e) => e.key === "Enter" && addGoal()}
+                                                onKeyDown={(e) => e.key === "Enter" && addGoal()}
                                                 placeholder="Add an aspiration..."
-                                                className="flex-1 px-4 py-2 bg-white border border-[#E8DED4] rounded-full text-[#3D3D3D] placeholder:text-[#8B8178]/50 focus:ring-2 focus:ring-[#5C6B4A]/20"
+                                                className="flex-1 px-5 py-3 bg-white/60 border border-[#E8DED4] rounded-full text-[#3D3D3D] text-sm placeholder:text-[#8B8178]/40 focus:outline-none focus:ring-2 focus:ring-[#5C6B4A]/15 focus:border-[#5C6B4A]/25 transition-all duration-500 backdrop-blur-sm"
+                                                style={{ fontFamily: "'Inter', sans-serif" }}
                                             />
                                             <button
                                                 onClick={addGoal}
-                                                className="p-2 rounded-full bg-[#5C6B4A] text-[#FDF8F3]"
+                                                className="w-11 h-11 rounded-full bg-[#5C6B4A] text-white flex items-center justify-center hover:bg-[#4A5A3A] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(92,107,74,0.2)] transition-all duration-500 shrink-0"
                                             >
-                                                <Plus className="w-5 h-5" />
+                                                <Plus className="w-4 h-4" />
                                             </button>
                                         </motion.div>
                                     )}
@@ -321,29 +396,31 @@ export default function ProfilePage() {
                             </div>
                         </motion.section>
 
-                        {/* Save Button */}
+                        {/* ──── Save Button ──── */}
                         <AnimatePresence>
                             {isEditing && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: 20 }}
+                                    transition={{ duration: 0.4, ease }}
                                     className="flex justify-center"
                                 >
                                     <button
                                         onClick={handleSave}
                                         disabled={isSaving}
-                                        className="flex items-center gap-2 px-8 py-3 bg-[#5C6B4A] text-[#FDF8F3] rounded-full font-medium hover:bg-[#4A5A3A] transition-all duration-500 disabled:opacity-50"
+                                        className="group flex items-center gap-3 px-10 py-4 bg-[#5C6B4A] text-white rounded-full font-bold text-base hover:bg-[#4A5A3A] hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(92,107,74,0.25)] transition-all duration-500 disabled:opacity-50 disabled:hover:translate-y-0"
                                     >
                                         {isSaving ? (
                                             <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Saving...
+                                                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                Saving changes...
                                             </>
                                         ) : (
                                             <>
                                                 <Check className="w-4 h-4" />
                                                 Save Changes
+                                                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                                             </>
                                         )}
                                     </button>
@@ -351,20 +428,20 @@ export default function ProfilePage() {
                             )}
                         </AnimatePresence>
 
-                        {/* Transparency Note */}
+                        {/* ──── Transparency Note ──── */}
                         <motion.section
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 25 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.4 }}
-                            className="bg-white/40 backdrop-blur-sm rounded-3xl p-6 border border-[#E8DED4]"
+                            transition={{ duration: 0.8, delay: 0.4, ease }}
+                            className="relative rounded-[2rem] p-7 md:p-8 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]"
                         >
                             <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center flex-shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center shrink-0">
                                     <Shield className="w-5 h-5 text-[#5C6B4A]" />
                                 </div>
                                 <div>
-                                    <h4 className="font-serif text-lg text-[#3D3D3D] mb-2">You control what grows here</h4>
-                                    <p className="text-[#8B8178] leading-relaxed">
+                                    <h4 className="text-[#3D3D3D] font-bold text-base mb-2" style={{ fontFamily: "'Inter', sans-serif" }}>You control what grows here</h4>
+                                    <p className="text-[#8B8178] text-sm leading-relaxed">
                                         Your roots, aspirations, and growth journey are yours alone.
                                         You can tend to them, prune what no longer serves you,
                                         or let them evolve naturally. Nothing is permanent unless you want it to be.
@@ -377,15 +454,27 @@ export default function ProfilePage() {
                         <motion.footer
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ duration: 0.6, delay: 0.5 }}
-                            className="text-center py-8"
+                            transition={{ duration: 0.8, delay: 0.6, ease }}
+                            className="py-6 flex items-center gap-3"
                         >
-                            <p className="text-sm text-[#8B8178]/50">
-                                Identity is not a destination. It's a garden you tend.
-                            </p>
+                            <div className="w-8 h-px bg-[#E8DED4]" />
+                            <span className="mono-tag text-[9px] text-[#8B8178]/30">Identity is not a destination — it's a garden you tend</span>
                         </motion.footer>
                     </div>
                 </main>
+            </div>
+
+            {/* ═══ MOBILE BOTTOM NAV ═══ */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-t border-[#E8DED4]/50 px-2 py-2 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-around">
+                    {navItems.map((item) => (
+                        <Link key={item.path} to={item.path} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ${item.active ? "text-[#5C6B4A]" : "text-[#8B8178]/50"}`}>
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-[9px] font-medium">{item.label}</span>
+                            {item.active && <div className="w-1 h-1 rounded-full bg-[#5C6B4A]" />}
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );
