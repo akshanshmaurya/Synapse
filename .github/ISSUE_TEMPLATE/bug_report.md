@@ -1,9 +1,10 @@
 ---
 name: Bug report
 about: Create a report to help us improve Synapse
-title: '[BUG] '
-labels: bug
+title: "[BUG] "
+labels: bug, enhancement
 assignees: ''
+
 ---
 
 **Description**
