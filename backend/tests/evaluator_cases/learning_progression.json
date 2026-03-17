@@ -1,0 +1,29 @@
+{
+  "case": "learning_progression",
+  "description": "Full learning arc: confused → explained → paraphrased correctly. Clarity should increase over time.",
+  "steps": [
+    {
+      "user": "I'm confused about what a hash table is.",
+      "assistant": "A hash table is a data structure that maps keys to values using a hash function for fast lookups."
+    },
+    {
+      "user": "Can you explain the hash function part more?",
+      "assistant": "A hash function takes a key and converts it into an array index. For example, hash('name') might produce index 3, so the value is stored at position 3."
+    },
+    {
+      "user": "So basically a hash function converts the key into a number that tells you where to look in the array, and that's why lookups are O(1) on average because you go directly to the right spot instead of searching.",
+      "assistant": "Exactly right! You've nailed the key insight — the direct mapping is what gives hash tables their speed."
+    }
+  ],
+  "expected": {
+    "step_1": {
+      "clarity_must_not_increase": true,
+      "struggle_detected": true
+    },
+    "step_3": {
+      "understanding_delta_min": 1,
+      "confusion_trend": ["improving"],
+      "positive_signals_not_empty": true
+    }
+  }
+}

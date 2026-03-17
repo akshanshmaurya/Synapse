@@ -1,0 +1,21 @@
+{
+  "case": "paraphrasing_success",
+  "description": "User correctly explains the concept in their own words — clarity should increase",
+  "steps": [
+    {
+      "user": "What is a closure in JavaScript?",
+      "assistant": "A closure is a function that remembers variables from the scope where it was created, even after that scope has finished executing."
+    },
+    {
+      "user": "Oh I see, so when I define a function inside another function, the inner one still has access to the outer variables even after the outer function returns. Like a backpack of variables it carries around.",
+      "assistant": "That's an excellent analogy! You've captured it perfectly."
+    }
+  ],
+  "expected": {
+    "step_2": {
+      "understanding_delta_min": 1,
+      "confusion_trend": ["improving", "stable"],
+      "positive_signals_not_empty": true
+    }
+  }
+}

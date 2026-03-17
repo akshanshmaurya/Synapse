@@ -1,0 +1,26 @@
+{
+  "case": "explicit_confusion",
+  "description": "User explicitly states they don't understand — clarity must NOT increase",
+  "steps": [
+    {
+      "user": "Can you explain recursion?",
+      "assistant": "Recursion is when a function calls itself to solve smaller instances of the same problem."
+    },
+    {
+      "user": "I don't understand this at all, it makes no sense to me.",
+      "assistant": "Let me try a different approach. Think of it like looking at two mirrors facing each other..."
+    }
+  ],
+  "expected": {
+    "step_1": {
+      "clarity_range": [30, 70],
+      "confusion_trend": ["stable", "improving"]
+    },
+    "step_2": {
+      "clarity_must_not_increase": true,
+      "understanding_delta_max": 0,
+      "confusion_trend": ["stable", "worsening"],
+      "struggle_detected": true
+    }
+  }
+}
