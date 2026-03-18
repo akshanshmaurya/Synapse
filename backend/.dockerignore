@@ -1,0 +1,14 @@
+# .dockerignore — Synapse Backend
+# Prevents unnecessary files from entering Docker images
+
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+tests/
+*.md
+.git/
+.github/

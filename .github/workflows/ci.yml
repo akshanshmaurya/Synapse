@@ -1,0 +1,42 @@
+name: CI — Synapse Backend
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install production dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run ruff lint
+        run: ruff check app/ tests/
+
+      - name: Run tests with coverage
+        env:
+          PYTHONPATH: "."
+          MONGO_URI: "mongodb://localhost:27017"
+          MONGODB_DB: "synapse_test"
+          JWT_SECRET: "ci-test-secret-do-not-use-in-production"
+          GEMINI_API_KEY: "ci-test-key"
+          ENVIRONMENT: "development"
+        run: pytest -q --tb=short --cov=app --cov-report=term
