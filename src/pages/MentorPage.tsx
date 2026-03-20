@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, ChevronDown, ChevronUp, AlertTriangle, RefreshCw } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -13,9 +13,10 @@ const ease = [0.23, 1, 0.32, 1] as const;
 
 interface Reflection {
     id: string;
-    type: "guidance" | "thought";
+    type: "guidance" | "thought" | "error";
     content: string;
     timestamp?: string;
+    onRetry?: () => void;
     evaluation?: {
         clarity_score: number;
         understanding_delta: number;
@@ -193,9 +194,15 @@ export default function MentorPage() {
             console.error("Session error", error);
             const errorGuidance: Reflection = {
                 id: (Date.now() + 1).toString(),
-                type: "guidance",
-                content: "I sense a moment of stillness in our connection. Please share your thought again, and we'll find our way together.",
-                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                type: "error",
+                content: "Failed to send message.",
+                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+                onRetry: () => {
+                    // Remove the error message
+                    setReflections(prev => prev.filter(r => r.id !== errorGuidance.id));
+                    // And resubmit
+                    handleSubmit();
+                }
             };
             setReflections(prev => [...prev, errorGuidance]);
         } finally {
@@ -372,7 +379,10 @@ export default function MentorPage() {
                                             <span className="text-sm text-[#8B8178]">Loading...</span>
                                         </div>
                                     ) : chatSessions.length === 0 ? (
-                                        <p className="text-sm text-[#8B8178]/60 text-center py-6">No previous conversations yet.</p>
+                                        <div className="py-8 flex flex-col items-center justify-center opacity-60">
+                                            <MessageSquare className="w-5 h-5 text-[#8B8178] mb-2" />
+                                            <p className="text-sm text-[#8B8178] text-center">No previous conversations yet.</p>
+                                        </div>
                                     ) : (
                                         <div className="space-y-1.5 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
                                             {chatSessions.map((session) => (
@@ -443,6 +453,23 @@ export default function MentorPage() {
                                                     
                                                     {/* Inject Evaluation Insights */}
                                                     <EvaluationBar evaluation={reflection.evaluation} />
+                                                </div>
+                                            </div>
+                                        ) : reflection.type === "error" ? (
+                                            /* ── Error Bubble ── */
+                                            <div className="flex items-start gap-4 max-w-[90%]">
+                                                <div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-1 shadow-[0_4px_12px_rgba(239,68,68,0.1)]">
+                                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="bg-white/60 backdrop-blur-[30px] rounded-[1.5rem] rounded-tl-lg p-5 border border-red-500/20 shadow-sm">
+                                                        <p className="text-[#3D3D3D] leading-relaxed text-[15px]">{reflection.content}</p>
+                                                    </div>
+                                                    <div className="mt-2.5 ml-2">
+                                                        <button onClick={reflection.onRetry} className="flex items-center gap-1.5 text-xs font-medium text-[#5C6B4A] bg-[#5C6B4A]/10 hover:bg-[#5C6B4A]/20 px-3 py-1.5 rounded-full transition-colors border border-[#5C6B4A]/20">
+                                                            <RefreshCw className="w-3.5 h-3.5" /> Retry
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ) : (

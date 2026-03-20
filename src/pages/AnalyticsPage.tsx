@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
     Home, MessageSquare, Map, User, BarChart3, ChevronRight,
     LogOut, TrendingUp, TrendingDown, Minus, Activity,
-    AlertTriangle, Zap, Brain, ArrowRight
+    AlertTriangle, Zap, Brain, ArrowRight, Leaf
 } from "lucide-react";
 import {
     AreaChart, Area, BarChart, Bar,
@@ -23,19 +23,25 @@ export default function AnalyticsPage() {
     const navigate = useNavigate();
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const analytics = await fetchAnalyticsData();
+            if (!analytics) throw new Error("No data");
+            setData(analytics);
+        } catch (e) {
+            console.error("Failed to load analytics", e);
+            setError("Unable to map your progress.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const load = async () => {
-            try {
-                const analytics = await fetchAnalyticsData();
-                setData(analytics);
-            } catch (e) {
-                console.error("Failed to load analytics", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        load();
+        loadData();
     }, []);
 
     const navItems = [
@@ -120,14 +126,16 @@ export default function AnalyticsPage() {
                         ))}
                     </nav>
                     <div className="p-4 space-y-2 mt-auto">
-                        {user && (
-                            <div className="px-5 py-4 rounded-2xl bg-[#5C6B4A]/5 border border-[#5C6B4A]/10">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center text-white text-sm font-bold">{(user.name || user.email)?.[0]?.toUpperCase()}</div>
-                                    <div className="min-w-0"><span className="text-sm text-[#3D3D3D] font-medium block truncate">{user.name || user.email}</span><span className="mono-tag text-[7px] text-[#8B8178]/50">Learner</span></div>
+                        {user ? (
+                            <>
+                                <div className="px-5 py-4 rounded-2xl bg-[#5C6B4A]/5 border border-[#5C6B4A]/10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-full bg-[#5C6B4A] flex items-center justify-center text-white text-sm font-bold">{(user.name || user.email)?.[0]?.toUpperCase()}</div>
+                                        <div className="min-w-0"><span className="text-sm text-[#3D3D3D] font-medium block truncate">{user.name || user.email}</span><span className="mono-tag text-[7px] text-[#8B8178]/50">Learner</span></div>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            </>
+                        ) : null}
                         <button onClick={() => { logout(); navigate("/"); }} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[#8B8178] hover:bg-red-50/80 hover:text-red-500 transition-all duration-500 w-full">
                             <LogOut className="w-[18px] h-[18px]" /><span className="text-sm font-medium">Sign Out</span>
                         </button>
@@ -147,16 +155,42 @@ export default function AnalyticsPage() {
                         </motion.header>
 
                         {isLoading ? (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-4">
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 gap-4">
                                 <div className="w-14 h-14 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_10px_30px_rgba(92,107,74,0.2)]">
                                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 </div>
-                                <span className="mono-tag text-[10px] text-[#8B8178]">Loading analytics...</span>
+                                <span className="mono-tag text-[10px] text-[#8B8178]">Analyzing metrics...</span>
                             </motion.div>
-
+                        ) : error ? (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-5 text-center px-4">
+                                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[#3D3D3D] font-bold text-lg">{error}</h3>
+                                    <p className="text-[#8B8178] text-sm mt-1 max-w-sm">Connection lost.</p>
+                                </div>
+                                <button onClick={loadData} className="mt-2 px-6 py-2.5 rounded-full bg-[#5C6B4A] text-white text-sm font-semibold hover:bg-[#4A5A3A] transition-colors shadow-md">
+                                    Retry
+                                </button>
+                            </motion.div>
                         ) : data ? (
-                            <>
-                                {/* ──── Summary Cards ──── */}
+                            data.summary.total_sessions === 0 ? (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-5 text-center px-4 bg-white/40 backdrop-blur-md rounded-3xl border border-[#E8DED4] shadow-sm">
+                                    <div className="w-16 h-16 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
+                                        <Leaf className="w-6 h-6 text-[#5C6B4A]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[#3D3D3D] font-bold text-lg">Not enough data yet.</h3>
+                                        <p className="text-[#8B8178] text-sm mt-1 max-w-sm">Complete a few sessions to see your analytics bloom.</p>
+                                    </div>
+                                    <button onClick={() => navigate("/mentor")} className="mt-3 px-6 py-2.5 rounded-full bg-[#5C6B4A] text-white text-sm font-semibold hover:bg-[#4A5A3A] transition-colors shadow-md flex items-center gap-2">
+                                        <MessageSquare className="w-4 h-4" /> Start Session
+                                    </button>
+                                </motion.div>
+                            ) : (
+                                <>
+                                    {/* ──── Summary Cards ──── */}
                                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.1, ease }}
                                     className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
@@ -307,20 +341,8 @@ export default function AnalyticsPage() {
                                     </motion.section>
                                 )}
                             </>
-                        ) : (
-                            /* Empty State */
-                            <motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease }}
-                                className="relative rounded-[2.5rem] p-14 text-center overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]">
-                                <div className="w-16 h-16 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center mx-auto mb-6">
-                                    <BarChart3 className="w-8 h-8 text-[#5C6B4A]" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-[#3D3D3D] mb-3 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>No data yet</h2>
-                                <p className="text-[#8B8178] mb-8 max-w-sm mx-auto text-sm">Start a mentoring session to begin building your analytics.</p>
-                                <Link to="/mentor" className="group inline-flex items-center gap-2 px-8 py-4 bg-[#5C6B4A] text-white rounded-full font-bold hover:bg-[#4A5A3A] hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(92,107,74,0.25)] transition-all duration-500">
-                                    Start a session <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                </Link>
-                            </motion.section>
-                        )}
+                            )
+                        ) : null}
 
                         <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.6, ease }} className="py-6 flex items-center gap-3">
                             <div className="w-8 h-px bg-[#E8DED4]" />

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Leaf, Sun, Droplets, Wind, Home, MessageSquare, Map, User, BarChart3,
-    ChevronRight, LogOut, ArrowRight, Sparkles, TrendingUp, Flame, Target
+    ChevronRight, LogOut, ArrowRight, Sparkles, TrendingUp, Flame, Target, AlertTriangle
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchDashboardData, DashboardData } from "@/services/api";
@@ -18,18 +18,24 @@ export default function DashboardPage() {
     const navigate = useNavigate();
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadDashboard = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const data = await fetchDashboardData();
+            if (!data) throw new Error("No data");
+            setDashboard(data);
+        } catch (e) {
+            console.error("Failed to load dashboard", e);
+            setError("Unable to load your garden.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadDashboard = async () => {
-            try {
-                const data = await fetchDashboardData();
-                setDashboard(data);
-            } catch (e) {
-                console.error("Failed to load dashboard", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         loadDashboard();
     }, []);
 
@@ -218,18 +224,41 @@ export default function DashboardPage() {
                         </motion.header>
 
                         {isLoading ? (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="flex flex-col items-center justify-center py-32 gap-4"
-                            >
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 gap-4">
                                 <div className="w-14 h-14 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_10px_30px_rgba(92,107,74,0.2)]">
                                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 </div>
-                                <span className="mono-tag text-[10px] text-[#8B8178]">Loading your garden...</span>
+                                <span className="mono-tag text-[10px] text-[#8B8178]">Growing your garden...</span>
+                            </motion.div>
+                        ) : error ? (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-5 text-center px-4">
+                                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[#3D3D3D] font-bold text-lg">{error}</h3>
+                                    <p className="text-[#8B8178] text-sm mt-1 max-w-sm">Connection lost.</p>
+                                </div>
+                                <button onClick={loadDashboard} className="mt-2 px-6 py-2.5 rounded-full bg-[#5C6B4A] text-white text-sm font-semibold hover:bg-[#4A5A3A] transition-colors shadow-md">
+                                    Retry
+                                </button>
                             </motion.div>
                         ) : dashboard ? (
-                            <>
+                            dashboard.effort.total_sessions === 0 ? (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-5 text-center px-4 bg-white/40 backdrop-blur-md rounded-3xl border border-[#E8DED4] shadow-sm">
+                                    <div className="w-16 h-16 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center">
+                                        <Leaf className="w-6 h-6 text-[#5C6B4A]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[#3D3D3D] font-bold text-lg">Your garden is waiting for seeds.</h3>
+                                        <p className="text-[#8B8178] text-sm mt-1 max-w-sm">Start a session to begin.</p>
+                                    </div>
+                                    <button onClick={() => navigate("/mentor")} className="mt-3 px-6 py-2.5 rounded-full bg-[#5C6B4A] text-white text-sm font-semibold hover:bg-[#4A5A3A] transition-colors shadow-md flex items-center gap-2">
+                                        <MessageSquare className="w-4 h-4" /> Start Session
+                                    </button>
+                                </motion.div>
+                            ) : (
+                                <>
                                 {/* ────────────────────────────────────────
                                     HERO: Momentum — Full-width dark card
                                    ──────────────────────────────────────── */}
@@ -609,35 +638,8 @@ export default function DashboardPage() {
                                     </motion.section>
                                 )}
                             </>
-                        ) : (
-                            /* ──── Empty State ──── */
-                            <motion.section
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.9, ease }}
-                                className="relative rounded-[2.5rem] p-16 text-center overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)]"
-                            >
-                                <div className="w-20 h-20 rounded-full bg-[#5C6B4A]/10 flex items-center justify-center mx-auto mb-8">
-                                    <Leaf className="w-10 h-10 text-[#5C6B4A]" />
-                                </div>
-                                <h2
-                                    className="text-3xl font-black text-[#5C6B4A] mb-3 tracking-tight"
-                                    style={{ fontFamily: "'Inter', sans-serif" }}
-                                >
-                                    Your garden is ready
-                                </h2>
-                                <p className="text-[#8B8178] mb-10 max-w-sm mx-auto text-base">
-                                    Start your first session to plant the seeds of growth.
-                                </p>
-                                <Link
-                                    to="/mentor"
-                                    className="group inline-flex items-center gap-3 px-9 py-4 bg-[#5C6B4A] text-white rounded-full font-bold text-base hover:bg-[#4A5A3A] hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(92,107,74,0.25)] transition-all duration-500"
-                                >
-                                    Start your first session
-                                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                </Link>
-                            </motion.section>
-                        )}
+                            )
+                        ) : null}
 
                         {/* Footer */}
                         <motion.footer

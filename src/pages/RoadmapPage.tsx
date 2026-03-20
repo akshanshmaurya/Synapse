@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Home, MessageSquare, Map, User, BarChart3, LogOut, ChevronRight, Compass, HelpCircle, RefreshCw, Check, ArrowRight } from "lucide-react";
+import { Home, MessageSquare, Map, User, BarChart3, LogOut, ChevronRight, Compass, HelpCircle, RefreshCw, Check, ArrowRight, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_URL } from "@/config/env";
 
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
 
 interface RoadmapStep {
     id: string;
@@ -52,19 +52,28 @@ export default function RoadmapPage() {
         { icon: User, label: "Roots", path: "/profile" },
     ];
 
+    const [error, setError] = useState<string | null>(null);
+
     useEffect(() => {
-        if (isAuthenticated) { fetchRoadmap(); }
+        if (isAuthenticated) { fetchRoadmapData(); }
         else { setIsLoading(false); }
     }, [isAuthenticated]);
 
-    const fetchRoadmap = async () => {
+    const fetchRoadmapData = async () => {
+        setIsLoading(true);
+        setError(null);
         try {
             const response = await fetch(`${API_URL}/api/roadmap/current`, { credentials: 'include' });
+            if (!response.ok) throw new Error("Connection failed");
             const data = await response.json();
             setRoadmap(data.roadmap);
             if (data.message) setMessage(data.message);
-        } catch (error) { console.error("Failed to fetch roadmap:", error); }
-        finally { setIsLoading(false); }
+        } catch (error) { 
+            console.error("Failed to fetch roadmap:", error); 
+            setError("Unable to map your pathway.");
+        } finally { 
+            setIsLoading(false); 
+        }
     };
 
     const generateRoadmap = async () => {
