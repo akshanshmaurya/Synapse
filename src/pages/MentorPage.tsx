@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, ChevronDown, ChevronUp, AlertTriangle, RefreshCw } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Sparkles, TrendingUp, Activity } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -25,53 +25,38 @@ interface Reflection {
     };
 }
 
-const EvaluationBar = ({ evaluation }: { evaluation?: Reflection["evaluation"] }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+const EvaluationTag = ({ evaluation }: { evaluation?: Reflection["evaluation"] }) => {
     if (!evaluation) return null;
 
+    let insightText = "";
+    let icon = null;
+    let colorClass = "";
+
+    const trend = (evaluation.confusion_trend || "").toLowerCase();
+    const engagement = (evaluation.engagement_level || "").toLowerCase();
+
+    if (trend === "increasing" || trend === "high" || evaluation.clarity_score < 50) {
+        insightText = "Needs clarification";
+        icon = <AlertTriangle className="w-3 h-3" />;
+        colorClass = "text-amber-600 bg-amber-500/10 border-amber-500/20";
+    } else if (evaluation.understanding_delta > 0 || evaluation.clarity_score > 70) {
+        insightText = "Improving understanding";
+        icon = <TrendingUp className="w-3 h-3" />;
+        colorClass = "text-[#5C6B4A] bg-[#5C6B4A]/10 border-[#5C6B4A]/20";
+    } else if (engagement === "high" || engagement === "strong") {
+        insightText = "Strong progress";
+        icon = <Sparkles className="w-3 h-3" />;
+        colorClass = "text-[#D4A574] bg-[#D4A574]/10 border-[#D4A574]/20";
+    } else {
+        insightText = "Stable understanding";
+        icon = <Activity className="w-3 h-3" />;
+        colorClass = "text-[#8B8178] bg-[#E8DED4]/30 border-[#E8DED4]";
+    }
+
     return (
-        <div className="mt-3 ml-2 w-full max-w-[85%] bg-white/40 backdrop-blur-md rounded-xl border border-[#E8DED4]/60 p-3 shadow-sm transition-all overflow-hidden relative group">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="flex items-center gap-4 text-[11px] font-medium text-[#5C6B4A]">
-                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
-                        <span className="opacity-70">Clarity:</span>
-                        <span>{evaluation.clarity_score}% {evaluation.clarity_score >= 50 ? "↑" : "↓"}</span>
-                    </div>
-                    <div className="w-px h-3 bg-[#E8DED4]/80"></div>
-                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
-                        <span className="opacity-70">Understanding:</span>
-                        <span className={evaluation.understanding_delta >= 0 ? "text-emerald-600" : "text-amber-600"}>
-                            {evaluation.understanding_delta > 0 ? "+" : ""}{evaluation.understanding_delta}
-                        </span>
-                    </div>
-                    <div className="w-px h-3 bg-[#E8DED4]/80"></div>
-                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
-                        <span className="opacity-70">Confusion:</span>
-                        <span className="capitalize">{evaluation.confusion_trend}</span>
-                    </div>
-                </div>
-                <button className="text-[#8B8178]/50 hover:text-[#5C6B4A] transition-colors">
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-            </div>
-            
-            <AnimatePresence>
-                {isExpanded && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                    >
-                        <div className="pt-3 mt-3 border-t border-[#E8DED4]/40 flex items-center justify-between text-[11px]">
-                            <span className="text-[#8B8178] px-2">Engagement Level</span>
-                            <span className="text-[#5C6B4A] font-medium capitalize px-2 py-0.5 bg-[#5C6B4A]/5 border border-[#5C6B4A]/10 rounded-md">
-                                {evaluation.engagement_level}
-                            </span>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div className={`mt-3 ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-medium transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] ${colorClass}`}>
+            {icon}
+            {insightText}
         </div>
     );
 };
@@ -452,7 +437,7 @@ export default function MentorPage() {
                                                     </div>
                                                     
                                                     {/* Inject Evaluation Insights */}
-                                                    <EvaluationBar evaluation={reflection.evaluation} />
+                                                    <EvaluationTag evaluation={reflection.evaluation} />
                                                 </div>
                                             </div>
                                         ) : reflection.type === "error" ? (
