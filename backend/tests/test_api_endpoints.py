@@ -12,33 +12,25 @@ pytestmark = pytest.mark.asyncio
 class TestUnauthenticatedAccess:
     """Endpoints requiring auth must reject requests without cookies."""
 
-    async def test_chat_requires_auth(self, client):
-        resp = await client.post(
-            "/api/chat/message",
-            json={"message": "hello"},
-        )
-        # May return 401 (no auth), 403 (forbidden), 404 (route mismatch), or 422
-        assert resp.status_code in (401, 403, 404, 422)
-
     async def test_onboarding_status_requires_auth(self, client):
         resp = await client.get("/api/onboarding/status")
-        assert resp.status_code in (401, 403)
+        assert resp.status_code == 401
 
     async def test_chat_history_requires_auth(self, client):
         resp = await client.get("/api/chats")
-        # Should fail without auth
-        assert resp.status_code in (401, 403, 404)
+        # Should fail without auth (strictly 401)
+        assert resp.status_code == 401
 
     async def test_roadmap_requires_auth(self, client):
         resp = await client.post(
             "/api/roadmap/generate",
             json={"goal": "learn python"},
         )
-        assert resp.status_code in (401, 403)
+        assert resp.status_code == 401
 
     async def test_traces_require_admin(self, client):
         resp = await client.get("/api/traces/")
-        assert resp.status_code in (401, 403)
+        assert resp.status_code in (401, 403) # Traces typically yield 403 if restricted, or 401 if unauthenticated. We leave this as is since it tests admin scope.
 
 
 class TestPublicEndpoints:

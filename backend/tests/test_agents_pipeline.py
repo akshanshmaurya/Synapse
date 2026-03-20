@@ -53,8 +53,8 @@ class TestPlannerAgent:
             "chat_intent": "learning python",
             "memory_update": {"new_interest": None, "new_goal": None, "struggle_detected": None},
         })
-        self.planner.model = MagicMock()
-        self.planner.model.generate_content.return_value = mock_genai_response(mock_json)
+        self.planner.client = MagicMock()
+        self.planner.client.models.generate_content.return_value = mock_genai_response(mock_json)
 
         result = self.planner.plan_response(sample_user_context, "How do I start learning Python?")
         assert result["strategy"] == "teach"
@@ -62,16 +62,16 @@ class TestPlannerAgent:
 
     def test_plan_response_handles_invalid_json(self, sample_user_context, mock_genai_response):
         """Planner returns default strategy when LLM returns garbage."""
-        self.planner.model = MagicMock()
-        self.planner.model.generate_content.return_value = mock_genai_response("not valid json at all!")
+        self.planner.client = MagicMock()
+        self.planner.client.models.generate_content.return_value = mock_genai_response("not valid json at all!")
 
         result = self.planner.plan_response(sample_user_context, "hello")
         assert result["strategy"] == "support"  # fallback
 
     def test_plan_response_handles_exception(self, sample_user_context):
         """Planner returns default strategy when LLM throws."""
-        self.planner.model = MagicMock()
-        self.planner.model.generate_content.side_effect = Exception("API failure")
+        self.planner.client = MagicMock()
+        self.planner.client.models.generate_content.side_effect = Exception("API failure")
 
         result = self.planner.plan_response(sample_user_context, "hello")
         assert result["strategy"] == "support"
@@ -79,8 +79,8 @@ class TestPlannerAgent:
     def test_plan_response_strips_code_fences(self, sample_user_context, mock_genai_response):
         """Planner correctly strips ```json fences from LLM output."""
         fenced = '```json\n{"strategy":"challenge","tone":"direct","focus_areas":[],"should_ask_question":false,"detected_emotion":"neutral","roadmap_relevant":false,"pacing":"accelerated","verbosity":"brief","max_lines":4,"voice_output_required":false,"chat_intent":"advanced topics","memory_update":{"new_interest":null,"new_goal":null,"struggle_detected":null}}\n```'
-        self.planner.model = MagicMock()
-        self.planner.model.generate_content.return_value = mock_genai_response(fenced)
+        self.planner.client = MagicMock()
+        self.planner.client.models.generate_content.return_value = mock_genai_response(fenced)
 
         result = self.planner.plan_response(sample_user_context, "I want a challenge")
         assert result["strategy"] == "challenge"
@@ -97,8 +97,8 @@ class TestExecutorAgent:
 
     def test_generate_response_with_mock(self, sample_user_context, mock_genai_response):
         """Executor returns a string response from LLM."""
-        self.executor.model = MagicMock()
-        self.executor.model.generate_content.return_value = mock_genai_response(
+        self.executor.client = MagicMock()
+        self.executor.client.models.generate_content.return_value = mock_genai_response(
             "Great question! Let me help you understand recursion step by step."
         )
         strategy = {"strategy": "teach", "tone": "warm", "verbosity": "normal", "pacing": "normal", "max_lines": 6}
@@ -109,8 +109,8 @@ class TestExecutorAgent:
 
     def test_generate_response_handles_exception(self, sample_user_context):
         """Executor returns fallback message on error."""
-        self.executor.model = MagicMock()
-        self.executor.model.generate_content.side_effect = Exception("API down")
+        self.executor.client = MagicMock()
+        self.executor.client.models.generate_content.side_effect = Exception("API down")
         strategy = {"strategy": "support", "tone": "warm", "verbosity": "normal", "pacing": "normal", "max_lines": 6}
 
         result = self.executor.generate_response(sample_user_context, "hello", strategy)
@@ -131,8 +131,8 @@ class TestEvaluatorFailSafe:
 
     def _mock_evaluation(self, evaluator, result_json, mock_genai_response):
         """Helper: mock the LLM to return a specific evaluation JSON."""
-        evaluator.model = MagicMock()
-        evaluator.model.generate_content.return_value = mock_genai_response(json.dumps(result_json))
+        evaluator.client = MagicMock()
+        evaluator.client.models.generate_content.return_value = mock_genai_response(json.dumps(result_json))
 
     def test_confusion_caps_clarity(self, sample_user_context, mock_genai_response):
         """If user says 'I don't understand', clarity must NOT increase."""
@@ -207,8 +207,8 @@ class TestEvaluatorFailSafe:
 
     def test_llm_error_returns_default(self, sample_user_context):
         """LLM exception returns safe default evaluation."""
-        self.evaluator.model = MagicMock()
-        self.evaluator.model.generate_content.side_effect = Exception("API error")
+        self.evaluator.client = MagicMock()
+        self.evaluator.client.models.generate_content.side_effect = Exception("API error")
 
         result = self.evaluator.evaluate_interaction("hello", "hi there", sample_user_context)
         assert result["clarity_score"] == 50
@@ -227,7 +227,7 @@ class TestStruggleDetection:
     def test_no_struggle_in_normal_message(self):
         """Normal messages should not trigger struggle detection."""
         # Mock the LLM so it's never called
-        self.evaluator.model = MagicMock()
+        self.evaluator.client = MagicMock()
         result = self.evaluator.detect_struggle("I learned about pandas today, it was fun!")
         assert result["is_struggle"] is False
 
@@ -238,8 +238,8 @@ class TestStruggleDetection:
             "topic": "recursion",
             "severity": "moderate",
         })
-        self.evaluator.model = MagicMock()
-        self.evaluator.model.generate_content.return_value = mock_genai_response(struggle_json)
+        self.evaluator.client = MagicMock()
+        self.evaluator.client.models.generate_content.return_value = mock_genai_response(struggle_json)
 
         result = self.evaluator.detect_struggle("I'm really struggling with recursion")
         assert result["is_struggle"] is True
@@ -248,8 +248,8 @@ class TestStruggleDetection:
     def test_struggle_keywords_case_insensitive(self, mock_genai_response):
         """Struggle detection is case-insensitive."""
         struggle_json = json.dumps({"is_struggle": True, "topic": "loops", "severity": "mild"})
-        self.evaluator.model = MagicMock()
-        self.evaluator.model.generate_content.return_value = mock_genai_response(struggle_json)
+        self.evaluator.client = MagicMock()
+        self.evaluator.client.models.generate_content.return_value = mock_genai_response(struggle_json)
 
         result = self.evaluator.detect_struggle("I'm CONFUSED about loops")
         assert result["is_struggle"] is True
