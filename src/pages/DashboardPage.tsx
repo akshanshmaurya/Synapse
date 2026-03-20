@@ -11,7 +11,7 @@ import { fetchDashboardData, DashboardData } from "@/services/api";
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
 
 export default function DashboardPage() {
     const { user, logout } = useAuth();
@@ -402,7 +402,7 @@ export default function DashboardPage() {
                                             initial={{ opacity: 0, y: 25 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.8, delay: 0.2, ease }}
-                                            className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all duration-[600ms] cursor-default lg:col-span-2"
+                                            className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all transition-duration-[600ms] cursor-default lg:col-span-2"
                                         >
                                             {/* Corner accent */}
                                             <div className="absolute top-5 right-5 w-2 h-2 rounded-full bg-[#5C6B4A]/20 group-hover:bg-[#5C6B4A]/40 transition-colors duration-500" />
@@ -448,7 +448,7 @@ export default function DashboardPage() {
                                         initial={{ opacity: 0, y: 25 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.8, delay: 0.3, ease }}
-                                        className="relative group rounded-[2rem] overflow-hidden bg-[#5C6B4A] hover:-translate-y-2 hover:shadow-[0_30px_60px_rgba(92,107,74,0.25)] transition-all duration-[600ms] cursor-pointer flex flex-col justify-between"
+                                        className="relative group rounded-[2rem] overflow-hidden bg-[#5C6B4A] hover:-translate-y-2 hover:shadow-[0_30px_60px_rgba(92,107,74,0.25)] transition-all transition-duration-[600ms] cursor-pointer flex flex-col justify-between"
                                         onClick={() => navigate("/mentor")}
                                     >
                                         {/* Grain */}
@@ -491,7 +491,7 @@ export default function DashboardPage() {
                                             initial={{ opacity: 0, y: 25 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.8, delay: 0.35, ease }}
-                                            className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all duration-[600ms] cursor-default lg:col-span-2"
+                                            className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all transition-duration-[600ms] cursor-default lg:col-span-2"
                                         >
                                             <div className="absolute top-5 right-5 w-2 h-2 rounded-full bg-[#D4A574]/20 group-hover:bg-[#D4A574]/40 transition-colors duration-500" />
 
@@ -524,7 +524,7 @@ export default function DashboardPage() {
                                         initial={{ opacity: 0, y: 25 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.8, delay: 0.4, ease }}
-                                        className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all duration-[600ms] cursor-pointer"
+                                        className="relative group rounded-[2rem] p-7 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-2 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_30px_60px_-12px_rgba(0,0,0,0.08)] transition-all transition-duration-[600ms] cursor-pointer"
                                         onClick={() => navigate("/analytics")}
                                     >
                                         <div className="absolute top-5 right-5 w-2 h-2 rounded-full bg-[#8B8178]/15 group-hover:bg-[#8B8178]/30 transition-colors duration-500" />

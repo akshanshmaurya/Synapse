@@ -16,7 +16,7 @@ import { fetchAnalyticsData, AnalyticsData } from "@/services/api";
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
 
 export default function AnalyticsPage() {
     const { user, logout } = useAuth();
@@ -161,7 +161,7 @@ export default function AnalyticsPage() {
                                     className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
                                     {/* Clarity */}
-                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all transition-duration-[600ms]">
                                         <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#5C6B4A]/20 group-hover:bg-[#5C6B4A]/40 transition-colors" />
                                         <div className="flex items-center gap-2 mb-4">
                                             <Brain className="w-4 h-4 text-[#5C6B4A]" />
@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
                                     </div>
 
                                     {/* Pace */}
-                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all transition-duration-[600ms]">
                                         <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#D4A574]/20 group-hover:bg-[#D4A574]/40 transition-colors" />
                                         <div className="flex items-center gap-2 mb-4">
                                             <Zap className="w-4 h-4 text-[#D4A574]" />
@@ -190,7 +190,7 @@ export default function AnalyticsPage() {
                                     </div>
 
                                     {/* Sessions */}
-                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all transition-duration-[600ms]">
                                         <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#5C6B4A]/20 group-hover:bg-[#5C6B4A]/40 transition-colors" />
                                         <div className="flex items-center gap-2 mb-4">
                                             <Activity className="w-4 h-4 text-[#5C6B4A]" />
@@ -203,7 +203,7 @@ export default function AnalyticsPage() {
                                     </div>
 
                                     {/* Struggles */}
-                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all duration-[600ms]">
+                                    <div className="group relative rounded-[1.5rem] p-6 overflow-hidden bg-white/45 backdrop-blur-[30px] border border-white/70 shadow-[inset_0_0_30px_rgba(255,255,255,0.5),0_15px_35px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1 hover:shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_25px_50px_-12px_rgba(0,0,0,0.07)] transition-all transition-duration-[600ms]">
                                         <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-amber-400/20 group-hover:bg-amber-400/40 transition-colors" />
                                         <div className="flex items-center gap-2 mb-4">
                                             <AlertTriangle className="w-4 h-4 text-amber-500" />

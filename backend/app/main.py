@@ -127,6 +127,7 @@ class ChatResponse(BaseModel):
     response: str
     chat_id: str = None
     requires_onboarding: bool = False
+    evaluation: dict = None
 
 
 class TTSRequest(BaseModel):
@@ -200,6 +201,7 @@ async def chat_endpoint(
         return ChatResponse(
             response=result["response"],
             chat_id=result["chat_id"],
+            evaluation=result.get("evaluation")
         )
     except Exception as e:
         logger.error("Chat API error: %s", e, exc_info=True)

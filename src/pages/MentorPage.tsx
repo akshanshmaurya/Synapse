@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2 } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -9,14 +9,71 @@ import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
 
 interface Reflection {
     id: string;
     type: "guidance" | "thought";
     content: string;
     timestamp?: string;
+    evaluation?: {
+        clarity_score: number;
+        understanding_delta: number;
+        confusion_trend: string;
+        engagement_level: string;
+    };
 }
+
+const EvaluationBar = ({ evaluation }: { evaluation?: Reflection["evaluation"] }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    if (!evaluation) return null;
+
+    return (
+        <div className="mt-3 ml-2 w-full max-w-[85%] bg-white/40 backdrop-blur-md rounded-xl border border-[#E8DED4]/60 p-3 shadow-sm transition-all overflow-hidden relative group">
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex items-center gap-4 text-[11px] font-medium text-[#5C6B4A]">
+                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
+                        <span className="opacity-70">Clarity:</span>
+                        <span>{evaluation.clarity_score}% {evaluation.clarity_score >= 50 ? "↑" : "↓"}</span>
+                    </div>
+                    <div className="w-px h-3 bg-[#E8DED4]/80"></div>
+                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
+                        <span className="opacity-70">Understanding:</span>
+                        <span className={evaluation.understanding_delta >= 0 ? "text-emerald-600" : "text-amber-600"}>
+                            {evaluation.understanding_delta > 0 ? "+" : ""}{evaluation.understanding_delta}
+                        </span>
+                    </div>
+                    <div className="w-px h-3 bg-[#E8DED4]/80"></div>
+                    <div className="flex items-center gap-1.5 hover:text-[#3D3D3D] transition-colors">
+                        <span className="opacity-70">Confusion:</span>
+                        <span className="capitalize">{evaluation.confusion_trend}</span>
+                    </div>
+                </div>
+                <button className="text-[#8B8178]/50 hover:text-[#5C6B4A] transition-colors">
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+            </div>
+            
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pt-3 mt-3 border-t border-[#E8DED4]/40 flex items-center justify-between text-[11px]">
+                            <span className="text-[#8B8178] px-2">Engagement Level</span>
+                            <span className="text-[#5C6B4A] font-medium capitalize px-2 py-0.5 bg-[#5C6B4A]/5 border border-[#5C6B4A]/10 rounded-md">
+                                {evaluation.engagement_level}
+                            </span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 export default function MentorPage() {
     const { user, logout } = useAuth();
@@ -124,7 +181,8 @@ export default function MentorPage() {
                 id: (Date.now() + 1).toString(),
                 type: "guidance",
                 content: result.response,
-                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+                evaluation: result.evaluation
             };
             setReflections(prev => [...prev, guidance]);
             const audio = await streamAudio(result.response);
@@ -382,6 +440,9 @@ export default function MentorPage() {
                                                         </button>
                                                         <span className="mono-tag text-[8px] text-[#8B8178]/25">{reflection.timestamp}</span>
                                                     </div>
+                                                    
+                                                    {/* Inject Evaluation Insights */}
+                                                    <EvaluationBar evaluation={reflection.evaluation} />
                                                 </div>
                                             </div>
                                         ) : (
@@ -486,7 +547,7 @@ export default function MentorPage() {
             </div>
 
             {/* Cognitive Trace Panel */}
-            <CognitiveTracePanel />
+            <CognitiveTracePanel sessionId={chatId} />
 
             {/* ═══ MOBILE BOTTOM NAV ═══ */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-t border-[#E8DED4]/50 px-2 py-2 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">

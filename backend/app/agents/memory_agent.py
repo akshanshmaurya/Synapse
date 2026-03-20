@@ -3,7 +3,7 @@ Memory Agent
 Stores and retrieves user profile, struggles, and progress.
 No user-facing output - writes to MongoDB.
 """
-import google.generativeai as genai
+from google import genai
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from bson import ObjectId
@@ -13,11 +13,9 @@ from app.models.memory import UserMemory, Struggle, UserProfile, UserProgress
 from app.core.config import settings
 from app.utils.logger import logger
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 class MemoryAgent:
     def __init__(self):
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
     async def get_user_context(self, user_id: str) -> Dict[str, Any]:
         """
@@ -141,7 +139,10 @@ Progress: {context['progress']}
 Write a warm, person-focused summary (not a list). Start with their stage of growth."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             summary = response.text.strip()
             
             # Store the summary

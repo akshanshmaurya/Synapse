@@ -9,19 +9,16 @@ CONSTRAINTS:
 - Must obey planner controls (verbosity, tone)
 - No filler language, be concise
 """
-import google.generativeai as genai
+from google import genai
 import json
 import uuid
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
 from app.utils.logger import logger
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
-
 class ExecutorAgent:
     def __init__(self):
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
     def generate_response(
         self, 
@@ -72,7 +69,10 @@ STRICT RULES:
 Respond now (max {max_lines} lines):"""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
             logger.error("Executor response error: %s", e)
@@ -104,7 +104,10 @@ VOICE RULES:
 Voice response:"""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
             logger.error("Executor voice error: %s", e)
@@ -195,7 +198,10 @@ USE ENCOURAGING COLORS:
 RESPOND ONLY WITH VALID JSON."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             # Clean JSON
@@ -310,7 +316,10 @@ The new roadmap should acknowledge growth while providing an easier path.
 RESPOND ONLY WITH VALID JSON."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             if text.startswith("```json"):

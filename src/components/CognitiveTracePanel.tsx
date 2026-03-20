@@ -9,9 +9,17 @@ interface Trace {
     action: string;
     details: any;
     timestamp: string;
+    input_summary?: string;
+    decision?: string;
+    reasoning?: string;
+    output_summary?: string;
 }
 
-export default function CognitiveTracePanel() {
+interface CognitiveTracePanelProps {
+    sessionId?: string | null;
+}
+
+export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelProps) {
     const [traces, setTraces] = useState<Trace[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [lastFetch, setLastFetch] = useState(Date.now());
@@ -21,7 +29,13 @@ export default function CognitiveTracePanel() {
         const fetchTraces = async () => {
             try {
                 // Add trailing slash to avoid 307 redirect
-                const res = await fetch(`${API_URL}/api/traces/?limit=20`);
+                const url = sessionId 
+                    ? `${API_URL}/api/traces/?limit=20&session_id=${sessionId}`
+                    : `${API_URL}/api/traces/?limit=20`;
+
+                const res = await fetch(url, {
+                    credentials: "include"
+                });
                 if (res.ok) {
                     const data = await res.json();
 
@@ -132,15 +146,40 @@ export default function CognitiveTracePanel() {
                             </span>
                         </div>
                         <div className="text-white mb-2 font-bold text-sm tracking-tight">{trace.action}</div>
-                        {trace.details && (
-                            <div className="mt-1 pl-2 border-l border-gray-700">
-                                {Object.entries(trace.details).map(([key, value]) => (
-                                    <div key={key} className="text-gray-400 truncate">
-                                        <span className="text-gray-500">{key}:</span> {String(value)}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        
+                        <div className="mt-1 pl-2 border-l border-[#5C6B4A]/40 space-y-1">
+                            {trace.decision && (
+                                <div className="text-gray-300 text-xs truncate">
+                                    <span className="text-gray-500 font-semibold mr-1">Decision:</span>
+                                    {trace.decision}
+                                </div>
+                            )}
+                            {trace.reasoning && (
+                                <div className="text-gray-300 text-xs truncate">
+                                    <span className="text-gray-500 font-semibold mr-1">Reasoning:</span>
+                                    {trace.reasoning}
+                                </div>
+                            )}
+                            {trace.output_summary && (
+                                <div className="text-gray-300 text-xs truncate">
+                                    <span className="text-gray-500 font-semibold mr-1">Outcome:</span>
+                                    {trace.output_summary}
+                                </div>
+                            )}
+                            
+                            {/* Fallback for legacy items without observability fields */}
+                            {(!trace.decision && !trace.reasoning && !trace.output_summary && trace.details) && (
+                                <div className="text-gray-400 text-xs truncate">
+                                    {trace.agent === 'Planner' && trace.details.strategy 
+                                        ? `selected strategy: "${trace.details.strategy}"` 
+                                        : trace.agent === 'Evaluator' && trace.details.clarity_score !== undefined
+                                        ? `clarity: ${trace.details.clarity_score}%`
+                                        : trace.agent === 'Executor' 
+                                        ? `generated response`
+                                        : JSON.stringify(trace.details)}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>

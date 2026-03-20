@@ -3,18 +3,16 @@ Evaluator Agent
 Analyzes interactions to detect struggles and update strategy effectiveness.
 Updates memory with insights including learning pace - no user-facing output.
 """
-import google.generativeai as genai
+from google import genai
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 from app.core.config import settings
 from app.utils.logger import logger
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 class EvaluatorAgent:
     def __init__(self):
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
     def evaluate_interaction(
         self, 
@@ -86,7 +84,10 @@ BE HONEST. Do not inflate clarity_score.
 RESPOND ONLY WITH VALID JSON."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             if text.startswith("```json"):
@@ -189,7 +190,10 @@ OUTPUT AS JSON:
 RESPOND ONLY WITH JSON."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             if text.startswith("```json"):
@@ -240,7 +244,10 @@ OUTPUT AS JSON:
 RESPOND ONLY WITH JSON."""
 
                 try:
-                    response = self.model.generate_content(prompt)
+                    response = self.client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
                     text = response.text.strip()
                     
                     if text.startswith("```json"):

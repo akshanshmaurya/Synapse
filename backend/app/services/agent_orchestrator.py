@@ -232,9 +232,22 @@ class AgentOrchestrator:
                 await chat_service.update_chat_title(chat_id, chat_title)
 
             # ========== STEP 7: PREPARE RESULT ==========
+            # Fetch latest available evaluation from previous messages
+            evaluation_data = None
+            prev_evaluations = user_context.get("progress", {}).get("evaluation_history", [])
+            if prev_evaluations:
+                latest_eval = prev_evaluations[-1]
+                evaluation_data = {
+                    "clarity_score": latest_eval.get("clarity_score", 0),
+                    "understanding_delta": latest_eval.get("understanding_delta", 0),
+                    "confusion_trend": latest_eval.get("confusion_trend", "stable"),
+                    "engagement_level": latest_eval.get("engagement_level", "medium"),
+                }
+
             result = {
                 "response": response,
-                "chat_id": chat_id
+                "chat_id": chat_id,
+                "evaluation": evaluation_data
             }
 
             # ========== STEP 8: ASYNC BACKGROUND TASKS ==========

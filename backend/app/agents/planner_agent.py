@@ -3,17 +3,15 @@ Planner Agent
 Decides guidance strategy based on user context.
 Outputs structured JSON decisions - no natural language.
 """
-import google.generativeai as genai
+from google import genai
 import json
 from typing import Dict, Any, Optional
 from app.core.config import settings
 from app.utils.logger import logger
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 class PlannerAgent:
     def __init__(self):
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
     def plan_response(self, user_context: Dict[str, Any], current_message: str) -> Dict[str, Any]:
         """
@@ -83,7 +81,10 @@ IMPORTANT: Adjust your strategy based on the clarity score. Do not push forward 
 RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             # Clean up response if needed
@@ -142,7 +143,10 @@ OUTPUT A JSON OBJECT with this structure:
 RESPOND ONLY WITH VALID JSON."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             text = response.text.strip()
             
             if text.startswith("```json"):

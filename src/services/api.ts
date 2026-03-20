@@ -6,6 +6,12 @@ import { API_URL } from '@/config/env';
 interface ChatResult {
     response: string;
     chatId: string | null;
+    evaluation?: {
+        clarity_score: number;
+        understanding_delta: number;
+        confusion_trend: string;
+        engagement_level: string;
+    };
 }
 
 export async function sendMessage(message: string, chatId?: string): Promise<ChatResult> {

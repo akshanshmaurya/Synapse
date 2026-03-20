@@ -11,7 +11,7 @@ Each trace answers:
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
-from app.db.mongodb import get_database
+from app.db.mongodb import get_database  # type: ignore
 
 
 class TraceService:
@@ -68,7 +68,12 @@ class TraceService:
         if db is not None:
             await db["system_traces"].insert_one(trace)
 
-    async def get_recent_traces(self, limit: int = 20) -> List[Dict[str, Any]]:
+    async def get_recent_traces(
+        self, 
+        limit: int = 20, 
+        user_id: Optional[str] = None, 
+        session_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
         Get most recent traces for the Cognitive Activity Panel UI.
         """
@@ -76,7 +81,13 @@ class TraceService:
         if db is None:
             return []
 
-        cursor = db["system_traces"].find().sort("timestamp", -1).limit(limit)
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        if session_id:
+            query["session_id"] = session_id
+
+        cursor = db["system_traces"].find(query).sort("timestamp", -1).limit(limit)
         traces = await cursor.to_list(length=limit)
 
         for t in traces:
