@@ -39,8 +39,21 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
-        """Allow CORS_ORIGINS to be supplied as a comma-separated env string."""
+        """Allow CORS_ORIGINS as JSON array, comma-separated, or single origin."""
+        if isinstance(v, list):
+            return v
         if isinstance(v, str):
+            v = v.strip()
+            # Try JSON first (e.g. '["http://localhost:5173"]')
+            if v.startswith("["):
+                import json
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [o.strip() for o in parsed if isinstance(o, str) and o.strip()]
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # Fall back to comma-separated
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
