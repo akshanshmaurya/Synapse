@@ -26,6 +26,8 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!isOpen) return;
+
         const fetchTraces = async () => {
             try {
                 // Add trailing slash to avoid 307 redirect
@@ -57,7 +59,7 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
         fetchTraces();
 
         return () => clearInterval(interval);
-    }, []);
+    }, [isOpen, sessionId]);
 
     const getAgentIcon = (agent: string) => {
         switch (agent) {

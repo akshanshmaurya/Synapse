@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # --- CORS ---
     # Set as a comma-separated string in .env, e.g.:
     #   CORS_ORIGINS=https://app.yoursite.com,https://yoursite.com
-    CORS_ORIGINS: List[str]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     # --- Cookies ---
     # Set to your apex domain, e.g.:
     #   COOKIE_DOMAIN=yoursite.com
-    COOKIE_DOMAIN: str
+    COOKIE_DOMAIN: str = "localhost"
 
     model_config = {
         "env_file": os.path.join(os.path.dirname(__file__), "..", "..", ".env"),

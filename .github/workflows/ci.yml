@@ -39,4 +39,6 @@ jobs:
           JWT_SECRET: "ci-test-secret-do-not-use-in-production"
           GEMINI_API_KEY: "ci-test-key"
           ENVIRONMENT: "development"
+          CORS_ORIGINS: "http://localhost:5173"
+          COOKIE_DOMAIN: "localhost"
         run: pytest -q --tb=short --cov=app --cov-report=term
