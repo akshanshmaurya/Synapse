@@ -86,7 +86,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # CORS (runs second)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -121,13 +121,31 @@ orchestrator = AgentOrchestrator()
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=5000)
     chat_id: str = None
+    session_goal: str = None  # Optional — user can explicitly set a session learning goal
+
+
+class EvaluationData(BaseModel):
+    """Session-scoped evaluation snapshot (NOT global clarity)."""
+    clarity_score: float = 50.0
+    understanding_delta: int = 0
+    confusion_trend: str = "stable"
+    engagement_level: str = "medium"
+
+
+class SessionContextData(BaseModel):
+    """Lightweight session state for frontend session-aware UI."""
+    goal: str = None
+    momentum: str = "cold_start"
+    active_concepts: list = []
+    message_count: int = 0
 
 
 class ChatResponse(BaseModel):
     response: str
     chat_id: str = None
     requires_onboarding: bool = False
-    evaluation: dict = None
+    evaluation: EvaluationData = None      # Session-scoped clarity, not global
+    session_context: SessionContextData = None  # NEW — omitted if v2 services unavailable
 
 
 class TTSRequest(BaseModel):
@@ -197,11 +215,24 @@ async def chat_endpoint(
             user_id,
             body.message,
             chat_id=body.chat_id,
+            session_goal=body.session_goal,
         )
+
+        # Build typed evaluation sub-model
+        eval_data = None
+        if result.get("evaluation"):
+            eval_data = EvaluationData(**result["evaluation"])
+
+        # Build typed session context sub-model (None when v2 unavailable)
+        ctx_data = None
+        if result.get("session_context"):
+            ctx_data = SessionContextData(**result["session_context"])
+
         return ChatResponse(
             response=result["response"],
             chat_id=result["chat_id"],
-            evaluation=result.get("evaluation")
+            evaluation=eval_data,
+            session_context=ctx_data,
         )
     except Exception as e:
         logger.error("Chat API error: %s", e, exc_info=True)

@@ -46,10 +46,30 @@ async def complete_onboarding(
     data: OnboardingData,
     current_user: dict = Depends(get_current_user)
 ):
-    """Complete the onboarding process"""
+    """
+    Complete the onboarding process.
+
+    Dual-write strategy (migration period):
+      1. Write to legacy user_memory collection (existing behavior, unchanged)
+      2. Write to new user_profiles collection via ProfileService (Phase 4.7)
+
+    If the ProfileService write fails, the legacy write still succeeds.
+    This ensures zero downtime during migration.
+
+    Wizard-to-profile field mapping:
+      experience_level   -> experience_level       (direct pass-through)
+      mentoring_style    -> mentoring_tone          (gentle/supportive -> supportive,
+                                                     direct -> balanced,
+                                                     challenging -> challenging)
+      guidance_type      -> career_interests        (career -> [career-growth],
+                                                     skills -> [skill-building], etc.)
+      (not captured yet) -> preferred_learning_style (defaults to "mixed")
+      (not captured yet) -> age_group               (Phase 5 wizard expansion)
+      (not captured yet) -> education_level          (Phase 5 wizard expansion)
+    """
     user_id = str(current_user["_id"])
     memory_collection = get_user_memory_collection()
-    
+
     onboarding_doc = {
         "is_complete": True,
         "why_here": data.why_here,
@@ -58,8 +78,8 @@ async def complete_onboarding(
         "mentoring_style": data.mentoring_style,
         "completed_at": datetime.utcnow()
     }
-    
-    # Update or create memory document
+
+    # --- Write 1: Legacy user_memory (UNCHANGED — keep during migration) ---
     result = await memory_collection.update_one(
         {"user_id": user_id},
         {
@@ -71,7 +91,32 @@ async def complete_onboarding(
         },
         upsert=True
     )
-    
+
+    # --- Write 2: New UserProfileV2 via ProfileService (Phase 4.7) ---
+    # ProfileService.update_from_onboarding() handles the field mapping internally
+    # (see profile_service.py _TONE_MAP and _GUIDANCE_TO_INTERESTS).
+    try:
+        from app.services.profile_service import profile_service
+        from app.utils.logger import logger
+
+        await profile_service.update_from_onboarding(
+            user_id=user_id,
+            data={
+                "experience_level": data.experience_level,
+                "mentoring_style": data.mentoring_style,
+                "guidance_type": data.guidance_type,
+            },
+        )
+        logger.debug("ProfileService dual-write succeeded for user=%s", user_id)
+    except Exception as e:
+        # Non-blocking: legacy write already succeeded above.
+        # Log the error so we can track migration reliability.
+        import logging
+        logging.getLogger(__name__).error(
+            "ProfileService dual-write failed for user=%s (legacy still OK): %s",
+            user_id, e,
+        )
+
     return {
         "success": True,
         "message": "Welcome! Your journey begins now.",

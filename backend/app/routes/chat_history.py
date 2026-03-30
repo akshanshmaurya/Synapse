@@ -139,3 +139,68 @@ async def delete_chat_session(
         )
     
     return {"success": True}
+
+
+# --- Session Context Endpoint (Phase 4.7) ---
+
+@router.get("/{chat_id}/context")
+async def get_chat_context(
+    chat_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Get the full session context for a chat (Phase 5+ frontend feature).
+
+    Returns three-layer snapshot:
+      - session: goal, domain, clarity, momentum, active_concepts, confusion_points, message_count
+      - concepts: active concept details (mastery, misconceptions, exposure)
+      - profile_summary: experience_level, learning_style, mentoring_tone
+
+    If any layer fails, returns partial data with defaults.
+    """
+    from app.services.session_context_service import session_context_service
+    from app.services.concept_memory_service import concept_memory_service
+    from app.services.profile_service import profile_service
+    from app.utils.logger import logger
+
+    user_id = str(user["_id"])
+
+    # --- Session layer ---
+    try:
+        session = await session_context_service.get_session_summary(chat_id)
+    except Exception as e:
+        logger.error("get_chat_context: session fetch failed: %s", e)
+        session = {
+            "goal": None, "domain": None, "clarity": 50.0,
+            "momentum": "cold_start", "active_concepts": [],
+            "confusion_points": [], "message_count": 0,
+        }
+
+    # --- Concept layer ---
+    try:
+        concepts = await concept_memory_service.get_concept_context_for_agents(
+            user_id, session.get("active_concepts", [])
+        )
+    except Exception as e:
+        logger.error("get_chat_context: concept fetch failed: %s", e)
+        concepts = {"active": {}, "related_weak": [], "overall_mastery_average": 0.0}
+
+    # --- Profile layer ---
+    try:
+        profile_summary = await profile_service.get_profile_context_for_agents(user_id)
+    except Exception as e:
+        logger.error("get_chat_context: profile fetch failed: %s", e)
+        profile_summary = {
+            "experience_level": "beginner",
+            "preferred_learning_style": "mixed",
+            "mentoring_tone": "balanced",
+            "career_interests": [],
+            "strengths_summary": [],
+            "weaknesses_summary": [],
+        }
+
+    return {
+        "session": session,
+        "concepts": concepts,
+        "profile_summary": profile_summary,
+    }

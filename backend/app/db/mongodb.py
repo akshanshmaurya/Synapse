@@ -89,12 +89,52 @@ class MongoDB:
             roadmaps = cls.db["roadmaps"]
             await roadmaps.create_index("user_id")
 
+            # ------------------------------------------------------------------
+            # Phase 4.7: Three-Layer Memory Collections
+            # ------------------------------------------------------------------
+
+            # Layer 1: User Profiles (Identity Memory)
+            # One document per user — stores stable learner traits and preferences
+            user_profiles = cls.db["user_profiles"]
+            # Unique: exactly one profile per user
+            await user_profiles.create_index("user_id", unique=True)
+            # For querying recently-updated profiles (admin dashboards, batch jobs)
+            await user_profiles.create_index("updated_at")
+
+            # Layer 2: Concept Memory (Knowledge Map)
+            # One document per user — contains a dict of per-concept mastery records
+            concept_memory = cls.db["concept_memory"]
+            # Unique: exactly one concept memory document per user
+            await concept_memory.create_index("user_id", unique=True)
+            # Compound: enables efficient "get user's concept memory updated since X" queries
+            await concept_memory.create_index([("user_id", 1), ("updated_at", -1)])
+
+            # Layer 3: Session Contexts (Working Memory)
+            # One document per chat session — ephemeral, goal-directed state
+            session_contexts = cls.db["session_contexts"]
+            # Unique compound: one context per session per user
+            await session_contexts.create_index(
+                [("session_id", 1), ("user_id", 1)], unique=True
+            )
+            # For fetching all sessions belonging to a user
+            await session_contexts.create_index("user_id")
+            # TTL: auto-delete sessions inactive for 30 days (2,592,000 seconds)
+            # Sessions shouldn't live forever — 30 days is generous for users who take breaks
+            await session_contexts.create_index(
+                "updated_at", expireAfterSeconds=2_592_000
+            )
+
             logger.info("Database indexes successfully verified/created.")
         except Exception as e:
             logger.error("Failed to create database indexes: %s", e)
 
 def get_database():
     return MongoDB.get_db()
+
+
+def get_collection(name: str):
+    """Generic collection accessor — returns a Motor collection by name."""
+    return MongoDB.get_db()[name]
 
 
 # Collections
@@ -127,3 +167,16 @@ def get_chats_collection():
 def get_messages_collection():
     """Collection for individual chat messages"""
     return MongoDB.get_db()["messages"]
+
+# Phase 4.7: Three-Layer Memory collections
+def get_user_profiles_collection():
+    """Layer 1 — Identity Memory (one per user)"""
+    return MongoDB.get_db()["user_profiles"]
+
+def get_concept_memory_collection():
+    """Layer 2 — Knowledge Map (one per user, concepts dict inside)"""
+    return MongoDB.get_db()["concept_memory"]
+
+def get_session_contexts_collection():
+    """Layer 3 — Working Memory (one per chat session, TTL 30 days)"""
+    return MongoDB.get_db()["session_contexts"]

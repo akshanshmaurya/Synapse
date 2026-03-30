@@ -6,6 +6,8 @@ No hardcoded secrets anywhere in the codebase.
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List
+import logging
+import json
 import os
 
 
@@ -32,30 +34,27 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"  # development | production
 
     # --- CORS ---
-    # Set as a comma-separated string in .env, e.g.:
+    # Stored as a plain string to prevent pydantic-settings from
+    # attempting (and failing) JSON decoding of env-var values.
+    # Accepts: JSON array, comma-separated list, or a single origin.
     #   CORS_ORIGINS=https://app.yoursite.com,https://yoursite.com
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Allow CORS_ORIGINS as JSON array, comma-separated, or single origin."""
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-            # Try JSON first (e.g. '["http://localhost:5173"]')
-            if v.startswith("["):
-                import json
-                try:
-                    parsed = json.loads(v)
-                    if isinstance(parsed, list):
-                        return [o.strip() for o in parsed if isinstance(o, str) and o.strip()]
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            # Fall back to comma-separated
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    def get_cors_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS string into a list of origin URLs."""
+        v = self.CORS_ORIGINS.strip()
+        # Handle JSON array format (e.g. '["http://localhost:5173"]')
+        if v.startswith("["):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [o.strip() for o in parsed if isinstance(o, str) and o.strip()]
+            except (json.JSONDecodeError, TypeError) as ex:
+                logging.getLogger(__name__).warning(
+                    "Malformed JSON for CORS_ORIGINS: %r", v, exc_info=ex
+                )
+        # Comma-separated or single origin
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     # --- Cookies ---
     # Set to your apex domain, e.g.:

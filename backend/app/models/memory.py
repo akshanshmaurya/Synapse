@@ -83,6 +83,7 @@ class UserProgress(BaseModel):
     current_momentum_state: str = "unknown"  # Cached momentum classification
 
 class UserMemory(BaseModel):
+    # DEPRECATED: Being replaced by UserProfile + UserConceptMemory + SessionContext in Phase 4.7
     """Complete user memory document"""
     id: Optional[str] = Field(None, alias="_id")
     user_id: str
