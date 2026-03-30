@@ -17,6 +17,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.services.session_context_service import session_context_service
 from app.services.concept_memory_service import concept_memory_service, slugify_concept
+from app.knowledge.prerequisite_graph import is_in_zpd, get_prerequisites
 from app.utils.logger import logger
 
 
@@ -28,8 +29,9 @@ class EvaluatorAgent:
     # NEW: Session-aware evaluation with concept extraction
     # =========================================================================
 
-    def evaluate_interaction_v2(
+    async def evaluate_interaction_v2(
         self,
+        user_id: str,
         user_message: str,
         mentor_response: str,
         user_context: Dict[str, Any],
@@ -106,6 +108,32 @@ WHAT COUNTS AS POSITIVE UNDERSTANDING:
 - Answering "why" or "how" correctly
 - Correcting a previous misconception
 
+## Confusion Classification (only if confusion or low clarity detected)
+
+If clarity_score < 50 OR confusion markers are present, classify the
+type of confusion:
+
+confusion_type: one of:
+  - "prerequisite_gap" — user lacks knowledge needed for this concept
+    (e.g., can't understand recursion because they don't get function scope)
+  - "misconception" — user has a specific wrong mental model
+    (e.g., thinks recursion creates copies of the function)
+  - "surface_confusion" — user doesn't understand the explanation/phrasing
+    but probably understands the concept (just needs it rephrased)
+  - "overwhelm" — user is trying to process too much at once
+    (e.g., "I don't know where to start")
+  - "none" — no confusion detected
+
+If confusion_type is "prerequisite_gap":
+  - missing_prerequisite: what concept/knowledge is missing?
+
+If confusion_type is "misconception":
+  - misconception_detail: what specifically do they believe that's wrong?
+  - correct_model: what should they understand instead?
+
+If confusion_type is "overwhelm":
+  - overwhelm_source: too many concepts, too complex explanation, or lost context?
+
 OUTPUT AS JSON:
 {{
     "clarity_score": 0-100,
@@ -124,7 +152,12 @@ OUTPUT AS JSON:
     "pace_adjustment": null or "slow_down" or "speed_up" or "maintain",
     "concepts_discussed": ["list of specific technical concepts mentioned or explained — e.g. recursion, base case, stack overflow — NOT vague terms like programming or coding"],
     "concept_clarity": {{"concept_name": 0-100}} ,
-    "misconceptions_detected": {{"concept_name": "specific misunderstanding"}}
+    "misconceptions_detected": {{"concept_name": "specific misunderstanding"}},
+    "confusion_type": "one of the types listed above",
+    "missing_prerequisite": "concept name or null",
+    "misconception_detail": "detail string or null",
+    "correct_model": "correct model string or null",
+    "overwhelm_source": "source string or null"
 }}
 
 BE HONEST. Do not inflate clarity_score.
@@ -201,6 +234,14 @@ RESPOND ONLY WITH VALID JSON."""
         # END FAIL-SAFE
         # =============================================================
 
+        # --- Enhanced fail-safe: Confusion type default ---
+        # If confusion was detected by fail-safe but LLM didn't classify type,
+        # default to the safest assumption
+        if is_explicitly_confused and not result.get("confusion_type"):
+            result["confusion_type"] = "surface_confusion"
+            # Surface confusion is the safest default — it means "rephrase"
+            # rather than assuming a deeper problem
+
         # Ensure concept fields are present and well-typed
         if not isinstance(result.get("concepts_discussed"), list):
             result["concepts_discussed"] = []
@@ -208,6 +249,63 @@ RESPOND ONLY WITH VALID JSON."""
             result["concept_clarity"] = {}
         if not isinstance(result.get("misconceptions_detected"), dict):
             result["misconceptions_detected"] = {}
+
+        # --- ZPD Alignment Check ---
+        # This checks if the conversation is teaching in the user's ZPD
+        # Uses the prerequisite graph — no LLM involved
+        try:
+            t_zpd = time.monotonic()
+            concepts_discussed = result.get("concepts_discussed", [])
+            user_mastery = await concept_memory_service.get_user_mastery_dict(user_id)
+            
+            zpd_alignment = {}
+            for concept_name in concepts_discussed:
+                concept_id = slugify_concept(concept_name)
+                in_zpd = is_in_zpd(concept_id, user_mastery)
+                zpd_alignment[concept_id] = {
+                    "in_zpd": in_zpd,
+                    "current_mastery": user_mastery.get(concept_id, 0.0),
+                    "prerequisite_status": {
+                        p: user_mastery.get(p, 0.0)
+                        for p in get_prerequisites(concept_id)
+                    }
+                }
+
+            # If a concept is NOT in ZPD and clarity is low → the confusion is
+            # likely because we're teaching in Zone 3 (too hard)
+            for concept_id, alignment in zpd_alignment.items():
+                if not alignment["in_zpd"] and result.get("clarity_score", 50) < 40:
+                    # Override confusion_type to prerequisite_gap
+                    result["confusion_type"] = "prerequisite_gap"
+                    unmet = [
+                        p for p, m in alignment["prerequisite_status"].items()
+                        if m < 0.5
+                    ]
+                    result["missing_prerequisites"] = unmet
+
+            result["zpd_alignment"] = zpd_alignment
+            logger.debug(f"ZPD check completed in {(time.monotonic() - t_zpd) * 1000:.1f}ms")
+            
+            # --- Scaffolding Recommendation ---
+            # Based on Bruner's scaffolding theory (1976)
+            # Scaffolding level should match the inverse of mastery
+            t_scaffolding = time.monotonic()
+            primary_concept = concepts_discussed[0] if concepts_discussed else None
+            if primary_concept:
+                concept_id = slugify_concept(primary_concept)
+                mastery = user_mastery.get(concept_id, 0.0)
+                if mastery < 0.3:
+                    result["scaffolding_recommendation"] = "full"
+                elif mastery < 0.6:
+                    result["scaffolding_recommendation"] = "partial"
+                else:
+                    result["scaffolding_recommendation"] = "light"
+            else:
+                result["scaffolding_recommendation"] = "full"  # safe default
+            logger.debug(f"Scaffolding check completed in {(time.monotonic() - t_scaffolding) * 1000:.1f}ms")
+
+        except Exception as e:
+            logger.warning(f"Error during ZPD classification: {e}")
 
         return result
 
