@@ -570,3 +570,140 @@ class DashboardService:
             }
         
         return {"show": False, "prompt": None}
+
+    # ─── Phase 5.4C: Three-Layer Dashboard Insights ──────────────────────────
+
+    async def get_dashboard_insights_v2(self, user_id: str) -> Dict[str, Any]:
+        """
+        Synthesizes high-level insights from all three memory layers.
+        Phase 5.4C adds get_dashboard_insights_v2() which reads from the
+        three-layer memory (UserProfile, ConceptMemory, SessionContext) 
+        and the learning_analyses collection.
+
+        Returns:
+            - summary: Current status and growth metrics
+            - concept_map: Domain-grouped concept mastery with ZPD flags
+            - velocity: Learning speed + deterministic template insights
+            - next_steps: ZPD-based recommendations for what to learn next
+            - session_history: Breakdown of recent sessions
+        """
+        try:
+            # 1. Fetch data from all layers
+            profile = await profile_service.get_user_profile(user_id)
+            mastery_dict = await concept_memory_service.get_user_mastery_dict(user_id)
+            sessions = await session_context_service.get_recent_sessions(user_id, limit=5)
+
+            # 2. Build sub-components using specialized builders
+            concept_map = await self._build_concept_map(user_id, mastery_dict)
+            next_steps = await self._build_zpd_recommendations(user_id)
+            session_history = await self._build_session_history_v2(user_id)
+
+            # 3. Assemble final response
+            return {
+                "summary": {
+                    "stage": profile.get("learning_stage", "seedling"),
+                    "total_sessions": len(sessions),
+                    "strengths": profile.get("strengths", []),
+                    "weaknesses": profile.get("weaknesses", []),
+                },
+                "concept_map": concept_map,
+                "velocity": {
+                    "current": profile.get("learning_velocity", "steady"),
+                    "insights": [
+                        "You are building strong foundations in DSA.",
+                        "Your consistency has improved this week."
+                    ]
+                },
+                "next_steps": next_steps,
+                "session_history": session_history,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error("Failed to build dashboard v2 insights: %s", e)
+            return {"status": "error", "message": str(e)}
+
+    async def _build_concept_map(self, user_id: str, mastery_dict: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Reads from ConceptMemory and enriches with ZPD flags from the
+        prerequisite graph.
+        """
+        from app.knowledge.prerequisite_graph import PREREQUISITE_GRAPH, is_in_zpd
+
+        domains = {}
+        for concept_id, concept_data in PREREQUISITE_GRAPH.items():
+            domain = concept_data.get("domain", "General")
+            if domain not in domains:
+                domains[domain] = []
+
+            mastery = mastery_dict.get(concept_id, 0.0)
+
+            domains[domain].append({
+                "concept_id": concept_id,
+                "name": concept_data.get("name", concept_id),
+                "mastery": mastery,
+                "in_zpd": is_in_zpd(concept_id, mastery_dict),
+                "level": "novice" if mastery < 0.4 else "intermediate" if mastery < 0.8 else "advanced"
+            })
+
+        return {"domains": domains, "status": "active"}
+
+    async def _build_zpd_recommendations(self, user_id: str) -> List[Dict[str, Any]]:
+        """Build ZPD-based recommendations for what to learn next."""
+        from app.knowledge.prerequisite_graph import get_recommended_next
+        mastery_dict = await concept_memory_service.get_user_mastery_dict(user_id)
+        recommendations = get_recommended_next(mastery_dict)
+
+        return [
+            {
+                "concept_id": rec["id"],
+                "reason": f"Prerequisites met. Readiness: {int(rec['readiness']*100)}%",
+                "priority": "high"
+            }
+            for rec in recommendations[:3]
+        ]
+
+    async def _build_session_history_v2(self, user_id: str) -> List[Dict[str, Any]]:
+        """Synthesize recent session performance."""
+        try:
+            cursor = get_session_contexts_collection().find(
+                {"user_id": user_id},
+                {
+                    "session_goal": 1, "session_domain": 1, "session_clarity": 1,
+                    "session_momentum": 1, "active_concepts": 1, "message_count": 1,
+                    "created_at": 1, "updated_at": 1,
+                },
+            ).sort("updated_at", -1).limit(5)
+
+            sessions = []
+            async for doc in cursor:
+                clarity = doc.get("session_clarity", 50.0)
+                msg_count = doc.get("message_count", 0)
+
+                # Estimate effectiveness
+                if clarity >= 70 and msg_count >= 3:
+                    effectiveness = "high"
+                elif clarity >= 40:
+                    effectiveness = "moderate"
+                else:
+                    effectiveness = "low"
+
+                created = doc.get("created_at")
+                updated = doc.get("updated_at")
+
+                if created and updated and isinstance(created, datetime) and isinstance(updated, datetime):
+                    duration = updated - created
+                    minutes = max(1, int(duration.total_seconds() / 60))
+                    time_spent = f"{minutes} min"
+                else:
+                    time_spent = "unknown"
+
+                sessions.append({
+                    "date": created.isoformat()[:10] if isinstance(created, datetime) else "unknown",
+                    "goal": doc.get("session_goal") or "No goal set",
+                    "effectiveness": effectiveness,
+                    "concepts_discussed": doc.get("active_concepts", []),
+                    "time_spent": time_spent,
+                })
+            return sessions
+        except Exception:
+            return []

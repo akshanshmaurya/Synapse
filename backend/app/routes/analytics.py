@@ -138,3 +138,40 @@ def _empty_analytics() -> dict:
             "roadmap_regenerations": 0,
         },
     }
+
+# ─── Phase 5.4C: Three-Layer Dashboard Endpoints ─────────────────────────────
+
+from app.services.dashboard_service import DashboardService
+
+_dashboard_service = DashboardService()
+
+
+@router.get("/concept-map")
+async def get_concept_map(user_id: str = Depends(get_current_user)):
+    """
+    Returns domain-grouped concept mastery with ZPD flags.
+    Phase 5.4C — reads from ConceptMemory and prerequisite graph.
+    """
+    try:
+        insights = await _dashboard_service.get_dashboard_insights_v2(user_id)
+        return insights.get("concept_map", {"domains": {}, "status": "no_data"})
+    except Exception as e:
+        logger.error("Concept map error: %s", e)
+        return {"domains": {}, "status": "error"}
+
+
+@router.get("/recommendations")
+async def get_recommendations(user_id: str = Depends(get_current_user)):
+    """
+    Returns ZPD-based recommendations for what to learn next.
+    Phase 5.4C — uses prerequisite graph + ConceptMemory mastery.
+    """
+    try:
+        insights = await _dashboard_service.get_dashboard_insights_v2(user_id)
+        return {
+            "next_steps": insights.get("next_steps", []),
+            "velocity": insights.get("velocity", {}),
+        }
+    except Exception as e:
+        logger.error("Recommendations error: %s", e)
+        return {"next_steps": [], "velocity": {}}
