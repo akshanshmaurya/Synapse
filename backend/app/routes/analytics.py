@@ -2,11 +2,16 @@
 Learning Analytics Endpoint — Phase 4
 Aggregates evaluator history into time-series data for frontend charts.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
+import logging
 from datetime import datetime, timedelta
+from typing import Dict, Any, List
 from app.auth.dependencies import get_current_user
-from app.db.mongodb import get_user_memory_collection, MongoDB
-from app.utils.logger import logger
+from app.db.mongodb import get_user_memory_collection
+from app.services.dashboard_service import DashboardService
+
+logger = logging.getLogger(__name__)
+_dashboard_service = DashboardService()
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -140,10 +145,6 @@ def _empty_analytics() -> dict:
     }
 
 # ─── Phase 5.4C: Three-Layer Dashboard Endpoints ─────────────────────────────
-
-from app.services.dashboard_service import DashboardService
-
-_dashboard_service = DashboardService()
 
 
 @router.get("/concept-map")

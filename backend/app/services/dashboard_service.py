@@ -4,10 +4,23 @@ Derives display content from raw memory signals.
 Does NOT write to memory - only reads and computes.
 Enhanced with variety for different user personas.
 """
-from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
+from fastapi import APIRouter, Depends
 import random
-from app.db.mongodb import get_user_memory_collection, get_interactions_collection, get_roadmaps_collection
+import logging
+from datetime import datetime, timedelta
+from app.auth.dependencies import get_current_user
+from app.db.mongodb import (
+    get_user_memory_collection, 
+    get_interactions_collection, 
+    get_roadmaps_collection,
+    get_session_contexts_collection
+)
+from app.services.profile_service import profile_service
+from app.services.concept_memory_service import concept_memory_service
+from app.services.session_context_service import session_context_service
+
+logger = logging.getLogger(__name__)
 
 class DashboardService:
     """
@@ -160,11 +173,14 @@ class DashboardService:
                 "state": "starting",
                 "insight": random.choice(self.MOMENTUM_INSIGHTS["starting"]),
                 "metrics": {
-                    "clarity_score": 0,
-                    "understanding_trend": "stable",
-                    "understanding_delta": 0,
-                    "evaluation_count": 0
-                }
+                    "current_clarity": 50,
+                    "current_trend": "stable",
+                    "learning_pace": "moderate",
+                    "stage": "seedling",
+                    "total_sessions": 0,
+                    "total_evaluations": 0,
+                    "roadmap_regenerations": 0,
+                },
             },
             "effort": {
                 "sessions_this_week": 0,

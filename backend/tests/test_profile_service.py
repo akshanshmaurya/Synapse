@@ -133,7 +133,7 @@ class TestUpdateFromOnboarding:
         mock_col_fn.return_value = mock_col
 
         svc = _make_service()
-        profile = await svc.update_from_onboarding("user-1", {
+        await svc.update_from_onboarding("user-1", {
             "experience_level": "intermediate",
             "mentoring_style": "gentle",
             "guidance_type": "skills",
