@@ -486,8 +486,8 @@ class AgentOrchestrator:
 
             # ── Session-scoped evaluation (NEW) ────────────────────────────
             t0 = time.monotonic()
-            evaluation = self.evaluator_agent.evaluate_interaction_v2(
-                message, response, user_context
+            evaluation = await self.evaluator_agent.evaluate_interaction_v2(
+                user_id, message, response, user_context
             )
             eval_ms = round((time.monotonic() - t0) * 1000, 1)
 
