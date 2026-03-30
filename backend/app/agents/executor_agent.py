@@ -41,6 +41,18 @@ class ExecutorAgent:
         elif verbosity == "detailed":
             max_lines = 12
         
+        # Phase 5.3 Custom Strategy Overlays
+        strategy_overlay = ""
+        current_strategy = strategy.get("strategy", "support")
+        if current_strategy == "redirect":
+            prereqs = strategy.get("redirect_to_concepts", [])
+            target = prereqs[0] if prereqs else "foundational concepts"
+            strategy_overlay = f"\nCRITICAL INSTRUCTION: You MUST use this template structure: 'I notice you might benefit from strengthening your understanding of {target} before we dive deeper. Let me help with that first...'"
+        elif current_strategy == "correct_misconception":
+            misconception = strategy.get("misconception_to_address", "this concept")
+            correct_model = strategy.get("correct_model", "a different mental model")
+            strategy_overlay = f"\nCRITICAL INSTRUCTION: You MUST use this template structure: 'I want to clear up something important. You mentioned {misconception}. Actually, {correct_model}. Here's why...'"
+
         prompt = f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
 
 CONTEXT:
@@ -51,11 +63,12 @@ Goals: {user_context.get('profile', {}).get('goals', [])}
 MESSAGE: "{current_message}"
 
 PLANNER CONTROLS:
-- Approach: {strategy.get('strategy', 'support')}
+- Approach: {current_strategy}
 - Tone: {strategy.get('tone', 'warm')}
 - Verbosity: {verbosity}
 - Pacing: {pacing}
 - Ask question: {strategy.get('should_ask_question', True)}
+{strategy_overlay}
 
 STRICT RULES:
 1. DEFAULT STYLE: Point-to-point explanations. One sentence per point.

@@ -15,6 +15,140 @@ from app.core.config import settings
 from app.services.session_context_service import session_context_service
 from app.utils.logger import logger
 
+def compute_deterministic_strategy(context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Apply pedagogical rules to determine strategy.
+
+    Returns a strategy dict if a rule matches, None if LLM should decide.
+    Rules are ordered by priority — first match wins.
+
+    These rules encode Vygotsky's ZPD, Bruner's scaffolding, and
+    Csikszentmihalyi's flow theory as deterministic logic.
+    """
+    session = context.get("session", {})
+    last_eval = context.get("last_evaluation", {})
+    concepts = context.get("concepts", {})
+    momentum = session.get("momentum", "cold_start")
+    clarity = session.get("clarity", 50.0)
+    message_count = session.get("message_count", 0)
+    confusion_type = last_eval.get("confusion_type", "none")
+    scaffolding = last_eval.get("scaffolding_recommendation", "full")
+    zpd = last_eval.get("zpd_alignment", {})
+
+    # ─── RULE 1: First message in session ──────────────────
+    # Goal: Orient the learner. Don't dive into content immediately.
+    # Theoretical Basis: Establishing joint attention before cognitive load.
+    if message_count == 0:
+        return {
+            "strategy": "guide",
+            "tone": "warm",
+            "pacing": "slow",
+            "reasoning": "First message — orient and establish session goal",
+            "should_assess": False,
+            "should_infer_goal": True
+        }
+
+    # ─── RULE 2: Prerequisite gap detected ─────────────────
+    # The user is trying to learn something they're not ready for.
+    # Theoretical Basis: Vygotsky's Zone of Proximal Development (Zone 3 - Panic Zone).
+    if confusion_type == "prerequisite_gap":
+        missing = last_eval.get("missing_prerequisites", [])
+        return {
+            "strategy": "redirect",
+            "tone": "supportive",
+            "pacing": "slow",
+            "reasoning": f"Prerequisite gap detected. Missing: {missing}. Redirect to foundational concept.",
+            "redirect_to_concepts": missing,
+            "should_assess": False,
+            "should_infer_goal": False
+        }
+
+    # ─── RULE 3: Misconception detected ────────────────────
+    # The user has a specific wrong mental model. Address it directly.
+    # Theoretical Basis: Constructivist error correction.
+    if confusion_type == "misconception":
+        return {
+            "strategy": "correct_misconception",
+            "tone": "supportive",
+            "pacing": "slow",
+            "reasoning": f"Misconception detected: {last_eval.get('misconception_detail', 'unknown')}",
+            "misconception_to_address": last_eval.get("misconception_detail"),
+            "correct_model": last_eval.get("correct_model"),
+            "should_assess": True,
+            "should_infer_goal": False
+        }
+
+    # ─── RULE 4: User is overwhelmed ──────────────────────
+    # Too much information. Simplify, break it down.
+    # Theoretical Basis: Cognitive Load Theory (Intrinsic vs Extraneous overloads).
+    if confusion_type == "overwhelm":
+        return {
+            "strategy": "simplify",
+            "tone": "calm",
+            "pacing": "very_slow",
+            "reasoning": "User is overwhelmed. Break down into smallest possible step.",
+            "should_assess": False,
+            "should_infer_goal": False
+        }
+
+    # ─── RULE 5: Stuck state (from momentum) ──────────────
+    # Flow is broken. Provide encouragement.
+    # Theoretical Basis: Csikszentmihalyi's Flow Theory (Anxiety state).
+    if momentum == "stuck" and clarity < 30:
+        return {
+            "strategy": "encourage",
+            "tone": "warm",
+            "pacing": "slow",
+            "reasoning": "User is stuck with very low clarity. Encourage before teaching.",
+            "should_assess": False,
+            "should_infer_goal": False
+        }
+
+    # ─── RULE 6: In flow, high clarity ────────────────────
+    # User is learning effectively. Push them.
+    # Theoretical Basis: Csikszentmihalyi's Flow Theory (Flow channel optimization).
+    if momentum == "flowing" and clarity > 75:
+        return {
+            "strategy": "challenge",
+            "tone": context.get("profile", {}).get("mentoring_tone", "balanced"),
+            "pacing": "fast",
+            "reasoning": "User is in flow with high clarity. Challenge to deepen understanding.",
+            "should_assess": True,
+            "should_infer_goal": False
+        }
+
+    # ─── RULE 7: Scaffolding-based default ────────────────
+    # Theoretical Basis: Bruner's Scaffolding Theory (1976)
+    if scaffolding == "full":
+        return {
+            "strategy": "explain",
+            "tone": "supportive",
+            "pacing": "slow",
+            "reasoning": "Low mastery on active concepts. Full scaffolding — step-by-step explanation.",
+            "should_assess": False,
+            "should_infer_goal": False
+        }
+
+    if scaffolding == "partial":
+        return {
+            "strategy": "guide",
+            "tone": context.get("profile", {}).get("mentoring_tone", "balanced"),
+            "pacing": "medium",
+            "reasoning": "Medium mastery. Partial scaffolding — guide with hints.",
+            "should_assess": True,
+            "should_infer_goal": False
+        }
+
+    if scaffolding == "light":
+        return {
+            "strategy": "challenge",
+            "tone": "challenging",
+            "pacing": "fast",
+            "reasoning": "High mastery. Light scaffolding — challenge to solidify.",
+            "should_assess": True,
+            "should_infer_goal": False
+        }
+
+    return None
 
 class PlannerAgent:
     def __init__(self):
@@ -52,10 +186,37 @@ class PlannerAgent:
         session = user_context.get("session", {})
         concepts = user_context.get("concepts", {})
         recent_messages = user_context.get("recent_messages", [])
+        last_eval = user_context.get("last_evaluation", {})
+        pattern_insights = user_context.get("pattern_insights", {})
 
-        # --- Check for deterministic overrides (pre-LLM) ---
-        override = self._check_momentum_override(session)
+        # --- Phase 5.3 Deterministic Strategy Core ---
+        override_strategy = compute_deterministic_strategy(user_context)
+        if override_strategy:
+            # Merge with safe defaults so the Executor doesn't crash on missing dict keys
+            final_strategy = self._default_strategy_v2()
+            final_strategy.update(override_strategy)
+            
+            # The orchestrator uses _override_applied for Cognitive Trace logging
+            final_strategy["_override_applied"] = override_strategy.get("reasoning", "deterministic_rule")
+            
+            # Persist session goal if rule inferred it
+            if final_strategy.get("session_goal_inference"):
+                try:
+                    goal_inference = final_strategy["session_goal_inference"]
+                    domain = final_strategy.get("inferred_domain", "general")
+                    await session_context_service.update_session_goal(
+                        session_id=session.get("id"),
+                        user_id=profile.get("user_id"),
+                        goal=goal_inference,
+                        domain=domain,
+                    )
+                except Exception as e:
+                    logger.error("Failed to persist session goal inference from override: %s", e)
+            
+            logger.debug(f"Deterministic Override Triggered: {final_strategy['_override_applied']}")
+            return final_strategy
 
+        # --- Base LLM Fallback (only reached if all deterministic rules returned None) ---
         # --- Build concept mastery section for prompt ---
         concept_section = self._format_concept_section(concepts)
 
@@ -89,6 +250,16 @@ Current confusion: {', '.join(session.get('confusion_points', [])) or 'none'}
 
 ## Concept Mastery (relevant)
 {concept_section}
+
+## Last Evaluation Context (Phase 5.2 metrics)
+Confusion type: {last_eval.get('confusion_type', 'none')}
+Missing prerequisites: {', '.join(last_eval.get('missing_prerequisites', [])) or 'none'}
+Scaffolding recommendation: {last_eval.get('scaffolding_recommendation', 'full')}
+ZPD Alignment Data: {json.dumps(last_eval.get('zpd_alignment', {{}}))}
+
+## Learning Patterns & Velocity (Phase 5.1 metrics)
+Overall velocity: {pattern_insights.get('velocity', {{}}).get('overall_velocity', 'unknown')}
+Primary struggle pattern: {pattern_insights.get('struggle_patterns', {{}}).get('primary_struggle_type') or 'none'}
 
 ## Recent Conversation
 {recent_section or '(No prior messages in this session)'}
@@ -158,22 +329,6 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
             logger.error("Planner Agent error: %s", e)
             strategy = self._default_strategy_v2()
 
-        # --- Apply deterministic overrides (post-LLM) ---
-        # These CANNOT be overridden by the LLM. Same philosophy as the
-        # evaluator's confusion fail-safe.
-        if override:
-            strategy["strategy"] = override["strategy"]
-            strategy["pacing"] = override["pacing"]
-            if override.get("tone"):
-                strategy["tone"] = override["tone"]
-            strategy["_override_applied"] = override["reason"]
-            logger.debug(
-                "Planner override applied: %s -> strategy=%s pacing=%s",
-                override["reason"],
-                override["strategy"],
-                override["pacing"],
-            )
-
         # Ensure focus_concepts is always a list
         if not isinstance(strategy.get("focus_concepts"), list):
             strategy["focus_concepts"] = []
@@ -209,52 +364,6 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
 
         return strategy
 
-    @staticmethod
-    def _check_momentum_override(session: dict) -> Optional[dict]:
-        """
-        Deterministic momentum-aware strategy overrides.
-
-        These run BEFORE and AFTER the LLM call to enforce hard rules:
-
-        1. stuck + low clarity   -> force encourage + slow
-           Why: A struggling user needs emotional support before more content.
-           Pushing forward when clarity < 30 risks compounding confusion.
-
-        2. cold_start + msg 0    -> force guide
-           Why: First message in a new session — orient the user, don't
-           assume they know what to do.
-
-        3. flowing + high clarity -> allow challenge
-           Why: User is in the zone — this is the optimal moment to push.
-           Note: this is permissive (allows challenge) not forced.
-        """
-        momentum = session.get("momentum", "cold_start")
-        clarity = session.get("clarity", 50.0)
-        message_count = session.get("message_count", 0)
-
-        # Rule 1: Stuck + low clarity -> encourage, slow down
-        if momentum == "stuck" and clarity < 30:
-            return {
-                "strategy": "encourage",
-                "pacing": "slow",
-                "tone": "warm",
-                "reason": "stuck_low_clarity",
-            }
-
-        # Rule 2: Cold start + first message -> guide
-        if momentum == "cold_start" and message_count == 0:
-            return {
-                "strategy": "guide",
-                "pacing": "medium",
-                "tone": None,  # let LLM decide tone
-                "reason": "cold_start_first_message",
-            }
-
-        # Rule 3: Flowing + high clarity -> allow challenge (no override needed,
-        # the LLM prompt already encourages this, but we ensure it's not blocked)
-        # No override returned — LLM decides freely.
-
-        return None
 
     @staticmethod
     def _format_concept_section(concepts: dict) -> str:
