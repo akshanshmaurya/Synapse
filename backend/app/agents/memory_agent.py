@@ -22,6 +22,7 @@ from app.services.profile_service import profile_service
 from app.services.concept_memory_service import concept_memory_service, slugify_concept
 from app.services.session_context_service import session_context_service
 from app.services.chat_service import chat_service
+from app.services.learning_pattern_service import learning_pattern_service
 from app.utils.logger import logger
 
 
@@ -114,6 +115,28 @@ class MemoryAgent:
             missing.append("recent_messages")
         timing["messages_ms"] = round((time.monotonic() - t0) * 1000, 1)
 
+        # --- Extract last_evaluation from the most recent mentor message ---
+        last_evaluation = {}
+        for msg in reversed(recent_messages):
+            if msg.get("sender") in ("mentor", "system"):
+                last_evaluation = msg.get("metadata", {}).get("evaluation", {})
+                break
+
+        # --- Learning Pattern Service (Phase 5.1/5.3) ---
+        t0 = time.monotonic()
+        try:
+            velocity_data = await learning_pattern_service.analyze_learning_velocity(user_id)
+            pattern_data = await learning_pattern_service.detect_struggle_patterns(user_id)
+            pattern_insights = {
+                "velocity": velocity_data,
+                "struggle_patterns": pattern_data
+            }
+        except Exception as e:
+            logger.warning("retrieve_context: pattern fetch failed for user=%s: %s", user_id, e)
+            pattern_insights = {}
+            # Do NOT mark as missing; patterns are optional.
+        timing["patterns_ms"] = round((time.monotonic() - t0) * 1000, 1)
+
         # --- Context summary (deterministic, no LLM) ---
         context_summary = self._build_context_summary(profile, session, concepts)
 
@@ -130,6 +153,8 @@ class MemoryAgent:
             "session": session,
             "concepts": concepts,
             "recent_messages": recent_messages,
+            "pattern_insights": pattern_insights,
+            "last_evaluation": last_evaluation,
             "context_summary": context_summary,
             "_timing": timing,
             "_missing": missing,
