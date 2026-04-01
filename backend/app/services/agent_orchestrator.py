@@ -35,6 +35,8 @@ from app.services.chat_service import chat_service
 from app.services.session_context_service import session_context_service
 from app.services.trace_service import trace_service
 from app.models.chat import MessageSender
+from app.services.intent_classifier_service import intent_classifier_service
+from app.services.goal_inference_service import goal_inference_service
 from app.utils.logger import logger
 
 
@@ -44,6 +46,12 @@ class AgentOrchestrator:
         self.planner_agent = PlannerAgent()
         self.executor_agent = ExecutorAgent()
         self.evaluator_agent = EvaluatorAgent()
+        self._background_tasks = set()
+
+    async def wait_for_background_tasks(self):
+        """Wait for all background tasks to complete (useful for tests)."""
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
 
     async def process_message_async(
         self,
@@ -117,6 +125,40 @@ class AgentOrchestrator:
                 use_v2 = False
             step_timings["2_session_context"] = _elapsed(t0)
 
+            # ========== STEP 2.5: RECENT MESSAGES ==========
+            t0 = time.monotonic()
+            recent_msgs = await chat_service.get_context_window(chat_id, n=10)
+            recent_user_messages = [m["content"] for m in recent_msgs if m.get("sender") == "user"][-5:]
+            step_timings["2.5_fetch_context"] = _elapsed(t0)
+            
+            # ========== STEP 3: INTENT CLASSIFICATION ==========
+            t0 = time.monotonic()
+            if use_v2 and session_context:
+                if intent_classifier_service.should_reclassify(session_context, message):
+                    intent_result = intent_classifier_service.classify(
+                        message=message,
+                        message_count=session_context.message_count + 1,
+                        session_history=recent_user_messages
+                    )
+                    session_context.session_intent = intent_result.intent
+                    session_context.intent_classified_at_message = session_context.message_count
+            step_timings["3_intent"] = _elapsed(t0)
+
+            # ========== STEP 4: GOAL INFERENCE ==========
+            t0 = time.monotonic()
+            if use_v2 and session_context:
+                if goal_inference_service.should_infer(session_context):
+                    inference_result = goal_inference_service.infer_goal(
+                        session_history=recent_user_messages,
+                        session_domain=session_context.session_domain
+                    )
+                    if inference_result.confidence >= 0.5:
+                        session_context.session_goal = inference_result.inferred_goal
+                        session_context.session_domain = inference_result.inferred_domain
+                        session_context.goal_inferred = True
+                        session_context.goal_confirmed = False
+            step_timings["4_goal_inference"] = _elapsed(t0)
+
             # ========== STEP 3: ASSEMBLE MEMORY FROM 3 LAYERS ==========
             t0 = time.monotonic()
             if use_v2:
@@ -164,8 +206,8 @@ class AgentOrchestrator:
                     ),
                     decision="Fetch profile, session, concept memory, and recent messages in parallel.",
                     reasoning=(
-                        f"Session momentum: '{session_summary.get('momentum', 'cold_start')}'. "
-                        f"Session clarity: {session_summary.get('clarity', 50.0)}/100. "
+                        f"Session momentum: '{session_summary.get('session_momentum', 'cold_start')}'. "
+                        f"Session clarity: {session_summary.get('session_clarity', 50.0)}/100. "
                         f"Experience: '{profile_summary.get('experience_level', 'beginner')}'. "
                         f"Missing layers: {missing or 'none'}."
                     ),
@@ -234,8 +276,8 @@ class AgentOrchestrator:
                     session_id=chat_id,
                     input_summary=(
                         f"Message: \"{message[:120]}{'...' if len(message) > 120 else ''}\". "
-                        f"Momentum='{session_info.get('momentum', 'cold_start')}', "
-                        f"clarity={session_info.get('clarity', 50.0)}/100."
+                        f"Momentum='{session_info.get('session_momentum', 'cold_start')}', "
+                        f"clarity={session_info.get('session_clarity', 50.0)}/100."
                     ),
                     decision=(
                         f"strategy='{strategy.get('strategy')}', "
@@ -356,15 +398,15 @@ class AgentOrchestrator:
                 # Use session clarity from the assembled context
                 session_info = user_context.get("session", {})
                 evaluation_data = {
-                    "clarity_score": session_info.get("clarity", 50.0),
+                    "clarity_score": session_info.get("session_clarity", 50.0),
                     "understanding_delta": 0,
                     "confusion_trend": "stable",
                     "engagement_level": "medium",
                 }
                 # Session context snapshot for the frontend
                 session_context_data = {
-                    "goal": session_info.get("goal"),
-                    "momentum": session_info.get("momentum", "cold_start"),
+                    "goal": session_info.get("session_goal"),
+                    "momentum": session_info.get("session_momentum", "cold_start"),
                     "active_concepts": session_info.get("active_concepts", []),
                     "message_count": session_info.get("message_count", 0),
                 }
@@ -393,7 +435,7 @@ class AgentOrchestrator:
             )
 
             if use_v2:
-                asyncio.create_task(self._run_background_tasks_v2(
+                task = asyncio.create_task(self._run_background_tasks_v2(
                     user_id=user_id,
                     message=message,
                     response=response,
@@ -401,9 +443,11 @@ class AgentOrchestrator:
                     strategy=strategy,
                     request_id=request_id,
                     chat_id=chat_id,
+                    session_context=session_context,
+                    session_history=recent_user_messages
                 ))
             else:
-                asyncio.create_task(self._run_background_tasks(
+                task = asyncio.create_task(self._run_background_tasks(
                     user_id=user_id,
                     message=message,
                     response=response,
@@ -412,6 +456,9 @@ class AgentOrchestrator:
                     request_id=request_id,
                     chat_id=chat_id,
                 ))
+
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
             return result
 
@@ -426,6 +473,82 @@ class AgentOrchestrator:
     # NEW: Background tasks using three-layer memory
     # =========================================================================
 
+    async def _run_evaluator_background(self, message, response, user_context,
+                                         session_context, user_id, chat_id, request_id, strategy):
+        try:
+            # ── Struggle detection ─────────────────────────────
+            struggle_check = self.evaluator_agent.detect_struggle(message)
+            if struggle_check.get("is_struggle") and struggle_check.get("topic"):
+                await self.memory_agent.update_struggle(
+                    user_id,
+                    struggle_check["topic"],
+                    struggle_check.get("severity", "mild"),
+                )
+
+            eval_result_dict = await self.evaluator_agent.evaluate_interaction_v2(
+                user_id=user_id,
+                user_message=message,
+                mentor_response=response,
+                user_context=user_context
+            )
+            
+            # GUARD: skip all memory writes if evaluator flagged passive mode
+            if eval_result_dict.get("skip_memory_update"):
+                # Still log the trace
+                await trace_service.add_trace(
+                    request_id=request_id, agent="Evaluator", action="Interaction Scored (Passive)",
+                    details={"mode": eval_result_dict.get("evaluation_mode"), "engagement": eval_result_dict.get("engagement_level")},
+                    user_id=user_id, session_id=chat_id, input_summary="Passive evaluation due to non-learning intent.",
+                    decision="Skip concept and clarity updates.", reasoning="User is chatting casually.",
+                    output_summary="Passive check completed."
+                )
+                return
+
+            session = user_context.get("session", {})
+            new_clarity = eval_result_dict.get("clarity_score", 50)
+            prev_clarity = session.get("session_clarity", 50.0)
+            
+            # Write to session + concept memory
+            session_domain = session.get("session_domain")
+            await self.evaluator_agent.update_memory_from_evaluation_v2(
+                user_id=user_id,
+                session_id=chat_id,
+                session_domain=session_domain,
+                evaluation=eval_result_dict,
+            )
+
+            # Three-layer memory update via MemoryAgent facade
+            await self.memory_agent.update_memory(
+                user_id=user_id,
+                session_id=chat_id,
+                evaluation_result=eval_result_dict,
+            )
+
+            # ── Write to legacy memory too (backward compat) ───────────────
+            await self.evaluator_agent.update_memory_from_evaluation(user_id, eval_result_dict)
+            await self.memory_agent.store_evaluation_result(user_id, eval_result_dict)
+            await self.memory_agent.update_effort_metrics(user_id, session_occurred=True)
+
+            # ── Periodic learner-trait refresh (legacy) ────────────────────
+            if session.get("message_count", 0) % 10 == 0 and session.get("message_count", 0) > 0:
+                await self.memory_agent.update_learner_traits(user_id)
+
+        except Exception as e:
+            logger.error(f"Evaluator background task failed: {e}")
+
+    async def _run_profile_signal_update(self, message, session_history,
+                                          user_id, session_context):
+        try:
+            recent_messages = session_history[-3:] if session_history else []
+            signals = intent_classifier_service.extract_profile_signals(
+                message=message,
+                session_history=recent_messages
+            )
+            if signals.detected_interests or signals.implicit_goals:
+                await self.memory_agent.update_profile_signals(user_id, signals)
+        except Exception as e:
+            logger.warning(f"Profile signal update failed (non-critical): {e}")
+
     async def _run_background_tasks_v2(
         self,
         user_id: str,
@@ -434,148 +557,36 @@ class AgentOrchestrator:
         user_context: Dict,
         strategy: Dict,
         request_id: str,
+        session_context,
+        session_history: list,
         chat_id: Optional[str] = None,
     ):
         """
-        Phase 4.7 background tasks — session-scoped evaluation and memory updates.
-
-        Runs after the response is returned to the user. Failures here are
-        non-critical and logged but never propagated.
-
-        session_id == chat_id (see module docstring).
+        Phase 4.7 background tasks coordinating evaluation, profile signals, and DB updates.
         """
+        # Step 10 & 11 concurrent
+        await asyncio.gather(
+            self._run_evaluator_background(message, response, user_context, session_context, user_id, chat_id, request_id, strategy),
+            self._run_profile_signal_update(message, session_history, user_id, session_context),
+            return_exceptions=True
+        )
+
+        # STEP 12: Write session_context updates to DB
         try:
-            session = user_context.get("session", {})
-
-            # ── Struggle detection (unchanged) ─────────────────────────────
-            struggle_check = self.evaluator_agent.detect_struggle(message)
-            if struggle_check.get("is_struggle") and struggle_check.get("topic"):
-                # Write to legacy memory (evaluator reads from it)
-                await self.memory_agent.update_struggle(
-                    user_id,
-                    struggle_check["topic"],
-                    struggle_check.get("severity", "mild"),
-                )
-                await trace_service.add_trace(
-                    request_id=request_id,
-                    agent="Evaluator",
-                    action="Struggle Detected",
-                    details=struggle_check,
-                    user_id=user_id,
+            if session_context:
+                await session_context_service.update_session(
                     session_id=chat_id,
-                    input_summary=f"Scanned for struggle: \"{message[:120]}\".",
-                    decision=f"Flagged: '{struggle_check.get('topic')}'.",
-                    reasoning=f"Severity: '{struggle_check.get('severity', 'mild')}'.",
-                    output_summary=f"Struggle logged: '{struggle_check.get('topic')}'.",
+                    updates={
+                        "session_intent": getattr(session_context, 'session_intent', 'unknown'),
+                        "intent_classified_at_message": getattr(session_context, 'intent_classified_at_message', None),
+                        "session_goal": getattr(session_context, 'session_goal', None),
+                        "goal_inferred": getattr(session_context, 'goal_inferred', False),
+                        "goal_confirmed": getattr(session_context, 'goal_confirmed', False),
+                        "session_domain": getattr(session_context, 'session_domain', None),
+                    }
                 )
-
-            # ── Planner-driven legacy memory updates ───────────────────────
-            memory_update = strategy.get("memory_update", {})
-            if memory_update.get("new_interest"):
-                interests = user_context.get("profile", {}).get("career_interests", [])
-                new_interest = memory_update["new_interest"]
-                if new_interest not in interests:
-                    # Legacy write
-                    await self.memory_agent.update_profile(user_id, interests=interests + [new_interest])
-
-            if memory_update.get("new_goal"):
-                goals = user_context.get("profile", {}).get("career_interests", [])
-                new_goal = memory_update["new_goal"]
-                if new_goal not in goals:
-                    await self.memory_agent.update_profile(user_id, goals=[new_goal])
-
-            # ── Session-scoped evaluation (NEW) ────────────────────────────
-            t0 = time.monotonic()
-            evaluation = await self.evaluator_agent.evaluate_interaction_v2(
-                user_id, message, response, user_context
-            )
-            eval_ms = round((time.monotonic() - t0) * 1000, 1)
-
-            new_clarity = evaluation.get("clarity_score", 50)
-            prev_clarity = session.get("clarity", 50.0)
-            delta = evaluation.get("understanding_delta", 0)
-            trend = evaluation.get("confusion_trend", "stable")
-            concepts_found = evaluation.get("concepts_discussed", [])
-
-            if new_clarity > prev_clarity:
-                clarity_movement = f"increased {prev_clarity}→{new_clarity}"
-            elif new_clarity < prev_clarity:
-                clarity_movement = f"decreased {prev_clarity}→{new_clarity}"
-            else:
-                clarity_movement = f"unchanged at {new_clarity}"
-
-            await trace_service.add_trace(
-                request_id=request_id,
-                agent="Evaluator",
-                action="Interaction Scored (v2)",
-                details={
-                    "clarity_score": new_clarity,
-                    "delta": delta,
-                    "trend": trend,
-                    "concepts_extracted": concepts_found,
-                    "eval_ms": eval_ms,
-                },
-                user_id=user_id,
-                session_id=chat_id,
-                input_summary=f"Evaluated message+response. Prev clarity: {prev_clarity}/100.",
-                decision=f"clarity={new_clarity}/100, delta={delta:+d}, trend='{trend}'.",
-                reasoning=(
-                    f"{evaluation.get('reasoning', '')} "
-                    f"Concepts: {concepts_found or 'none'}. "
-                    f"Misconceptions: {evaluation.get('misconceptions_detected', {})}."
-                ),
-                output_summary=f"Clarity {clarity_movement}. Concepts: {len(concepts_found)}.",
-            )
-
-            # ── Write to session + concept memory (NEW) ────────────────────
-            t0 = time.monotonic()
-            session_domain = session.get("domain")
-            await self.evaluator_agent.update_memory_from_evaluation_v2(
-                user_id=user_id,
-                session_id=chat_id,
-                session_domain=session_domain,
-                evaluation=evaluation,
-            )
-            v2_write_ms = round((time.monotonic() - t0) * 1000, 1)
-
-            # ── Write to legacy memory too (backward compat) ───────────────
-            t0 = time.monotonic()
-            await self.evaluator_agent.update_memory_from_evaluation(user_id, evaluation)
-            await self.memory_agent.store_evaluation_result(user_id, evaluation)
-            await self.memory_agent.update_effort_metrics(user_id, session_occurred=True)
-            legacy_write_ms = round((time.monotonic() - t0) * 1000, 1)
-
-            await trace_service.add_trace(
-                request_id=request_id,
-                agent="Memory",
-                action="Three-Layer Update Complete",
-                details={
-                    "v2_write_ms": v2_write_ms,
-                    "legacy_write_ms": legacy_write_ms,
-                    "concepts_updated": len(concepts_found),
-                },
-                user_id=user_id,
-                session_id=chat_id,
-                input_summary="Dispatched evaluation to session, concept, and legacy memory.",
-                decision="Write to all three layers + legacy for backward compatibility.",
-                reasoning=f"v2 writes: {v2_write_ms}ms, legacy writes: {legacy_write_ms}ms.",
-                output_summary=f"Memory updated across all layers. Concepts: {len(concepts_found)}.",
-            )
-
-            # ── Three-layer memory update via MemoryAgent facade ───────────
-            # This handles: session clarity, concept mastery, profile strengths/weaknesses
-            await self.memory_agent.update_memory(
-                user_id=user_id,
-                session_id=chat_id,
-                evaluation_result=evaluation,
-            )
-
-            # ── Periodic learner-trait refresh (legacy) ────────────────────
-            if session.get("message_count", 0) % 10 == 0 and session.get("message_count", 0) > 0:
-                await self.memory_agent.update_learner_traits(user_id)
-
         except Exception as e:
-            logger.warning("Background task v2 error (non-critical): %s", e, exc_info=True)
+            logger.warning(f"STEP 12 final session context DB write failed: {e}")
 
     # =========================================================================
     # LEGACY: Original background tasks (used when v2 services fail)

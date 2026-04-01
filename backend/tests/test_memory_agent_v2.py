@@ -38,12 +38,12 @@ def _profile_context() -> dict:
 
 def _session_summary(goal="Learn recursion", momentum="flowing") -> dict:
     return {
-        "goal": goal,
-        "domain": "dsa",
-        "clarity": 72.0,
-        "momentum": momentum,
+        "session_goal": goal,
+        "session_domain": "dsa",
+        "session_clarity": 72.0,
+        "session_momentum": momentum,
         "active_concepts": ["recursion", "base-case"],
-        "confusion_points": [],
+        "session_confusion_points": [],
         "message_count": 6,
     }
 
@@ -106,8 +106,8 @@ class TestRetrieveContext:
 
         # Layer content correct
         assert ctx["profile"]["experience_level"] == "intermediate"
-        assert ctx["session"]["goal"] == "Learn recursion"
-        assert ctx["session"]["momentum"] == "flowing"
+        assert ctx["session"]["session_goal"] == "Learn recursion"
+        assert ctx["session"]["session_momentum"] == "flowing"
         assert "recursion" in ctx["concepts"]["active"]
         assert len(ctx["recent_messages"]) == 2
         assert ctx["_missing"] == []
@@ -142,7 +142,7 @@ class TestRetrieveContext:
         assert ctx["profile"] == {}
         assert "profile" in ctx["_missing"]
         # Other layers should still work
-        assert ctx["session"]["goal"] == "Learn recursion"
+        assert ctx["session"]["session_goal"] == "Learn recursion"
         assert "recursion" in ctx["concepts"]["active"]
 
     @patch(CHAT_SVC)
@@ -160,9 +160,9 @@ class TestRetrieveContext:
         """
         mock_profile.get_profile_context_for_agents = AsyncMock(return_value=_profile_context())
         mock_session.get_session_summary = AsyncMock(return_value={
-            "goal": None, "domain": None, "clarity": 50.0,
-            "momentum": "cold_start", "active_concepts": [],
-            "confusion_points": [], "message_count": 0,
+            "session_goal": None, "session_domain": None, "session_clarity": 50.0,
+            "session_momentum": "cold_start", "active_concepts": [],
+            "session_confusion_points": [], "message_count": 0,
         })
         mock_concept.get_concept_context_for_agents = AsyncMock(return_value={
             "active": {}, "related_weak": [], "overall_mastery_average": 0.0,
@@ -174,8 +174,8 @@ class TestRetrieveContext:
             user_id="user-1", session_id="new-sess", message="hello"
         )
 
-        assert ctx["session"]["clarity"] == 50.0
-        assert ctx["session"]["momentum"] == "cold_start"
+        assert ctx["session"]["session_clarity"] == 50.0
+        assert ctx["session"]["session_momentum"] == "cold_start"
         assert ctx["concepts"]["active"] == {}
 
 

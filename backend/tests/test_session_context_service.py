@@ -366,12 +366,12 @@ class TestGetSessionSummary:
         svc = _make_service()
         summary = await svc.get_session_summary("sess-1")
 
-        assert summary["goal"] == "Learn recursion"
-        assert summary["domain"] == "dsa"
-        assert summary["clarity"] == 72.0
-        assert summary["momentum"] == "flowing"
+        assert summary["session_goal"] == "Learn recursion"
+        assert summary["session_domain"] == "dsa"
+        assert summary["session_clarity"] == 72.0
+        assert summary["session_momentum"] == "flowing"
         assert summary["active_concepts"] == ["recursion", "base-case"]
-        assert summary["confusion_points"] == ["stack overflow"]
+        assert summary["session_confusion_points"] == ["stack overflow"]
         assert summary["message_count"] == 6
 
     @patch(COLLECTION_PATH)
@@ -389,9 +389,9 @@ class TestGetSessionSummary:
         svc = _make_service()
         summary = await svc.get_session_summary("nonexistent")
 
-        assert summary["goal"] is None
-        assert summary["clarity"] == 50.0
-        assert summary["momentum"] == "cold_start"
+        assert summary["session_goal"] is None
+        assert summary["session_clarity"] == 50.0
+        assert summary["session_momentum"] == "cold_start"
         assert summary["message_count"] == 0
 
 

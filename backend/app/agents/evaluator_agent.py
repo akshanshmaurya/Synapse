@@ -56,6 +56,35 @@ class EvaluatorAgent:
         session = user_context.get("session", {})
         concepts = user_context.get("concepts", {})
 
+        session_intent = session.get("session_intent", "unknown")
+
+        # --- INTENT GUARD ---
+        if session_intent == "casual":
+            # Casual sessions: skip concept analysis entirely.
+            return {
+                "clarity_score": None,
+                "understanding_delta": 0,
+                "confusion_trend": "not_applicable",
+                "engagement_level": self._estimate_engagement(user_message),
+                "struggle_detected": None,
+                "concepts_discussed": [],
+                "evaluation_mode": "passive",
+                "skip_memory_update": True
+            }
+
+        # For unknown intent with message_count <= 2: also run passive mode
+        if session_intent == "unknown" and session.get("message_count", 0) <= 2:
+            return {
+                "clarity_score": None,
+                "understanding_delta": 0,
+                "confusion_trend": "not_applicable",
+                "engagement_level": self._estimate_engagement(user_message),
+                "struggle_detected": None,
+                "concepts_discussed": [],
+                "evaluation_mode": "passive",
+                "skip_memory_update": True
+            }
+
         # Previous clarity from session (session-scoped, not global)
         prev_clarity = session.get("clarity", 50.0)
 
@@ -424,7 +453,17 @@ RESPOND ONLY WITH VALID JSON."""
         base["concepts_discussed"] = []
         base["concept_clarity"] = {}
         base["misconceptions_detected"] = {}
+        base["evaluation_mode"] = "active"
+        base["skip_memory_update"] = False
         return base
+
+    def _estimate_engagement(self, message: str) -> str:
+        """Estimate engagement purely based on message length for passive mode."""
+        if len(message) > 100:
+            return "high"
+        elif len(message) > 30:
+            return "medium"
+        return "low"
 
     # =========================================================================
     # LEGACY: Original methods preserved for backward compatibility

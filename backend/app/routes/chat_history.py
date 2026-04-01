@@ -171,9 +171,11 @@ async def get_chat_context(
     except Exception as e:
         logger.error("get_chat_context: session fetch failed: %s", e)
         session = {
-            "goal": None, "domain": None, "clarity": 50.0,
-            "momentum": "cold_start", "active_concepts": [],
-            "confusion_points": [], "message_count": 0,
+            "session_goal": None, "session_intent": "unknown",
+            "goal_inferred": False, "goal_confirmed": False,
+            "session_domain": None, "session_clarity": 50.0,
+            "session_momentum": "cold_start", "active_concepts": [],
+            "session_confusion_points": [], "message_count": 0,
         }
 
     # --- Concept layer ---

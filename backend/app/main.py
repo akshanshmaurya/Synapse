@@ -124,6 +124,11 @@ class ChatRequest(BaseModel):
     session_goal: str = None  # Optional — user can explicitly set a session learning goal
 
 
+class GoalUpdateRequest(BaseModel):
+    goal: str
+    confirmed: bool = True
+
+
 class EvaluationData(BaseModel):
     """Session-scoped evaluation snapshot (NOT global clarity)."""
     clarity_score: float = 50.0
@@ -260,6 +265,44 @@ async def chat_guest_endpoint(
         return ChatResponse(
             response="I'm having a moment of reflection. Could you share that thought again?"
         )
+
+@app.patch("/api/chats/{chat_id}/context/goal")
+async def update_session_goal(
+    chat_id: str,
+    request_body: GoalUpdateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Allow user to manually set or confirm the inferred goal."""
+    from bson import ObjectId
+    from app.db.mongodb import get_chats_collection
+    from app.services.session_context_service import session_context_service
+
+    user_id = str(current_user["_id"])
+    
+    # Verify ownership
+    try:
+        chats = get_chats_collection()
+        chat = await chats.find_one({"_id": ObjectId(chat_id)})
+        if not chat or str(chat.get("user_id")) != user_id:
+            raise HTTPException(status_code=404, detail="Chat not found or access denied")
+    except Exception as e:
+        logger.error(f"Error fetching chat: {e}")
+        raise HTTPException(status_code=400, detail="Invalid chat ID format")
+        
+    # Update Goal in session_contexts
+    try:
+        await session_context_service.update_session(
+            session_id=chat_id,
+            updates={
+                "session_goal": request_body.goal,
+                "goal_inferred": not request_body.confirmed, 
+                "goal_confirmed": request_body.confirmed
+            }
+        )
+        return {"success": True, "goal": request_body.goal, "confirmed": request_body.confirmed}
+    except Exception as e:
+        logger.error(f"Failed to update session goal: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # --- TTS ---

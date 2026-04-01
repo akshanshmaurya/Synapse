@@ -64,12 +64,12 @@ def _mock_v2_context(session_goal=None, momentum="cold_start", clarity=50.0) -> 
             "weaknesses_summary": [],
         },
         "session": {
-            "goal": session_goal,
-            "domain": None,
-            "clarity": clarity,
-            "momentum": momentum,
+            "session_goal": session_goal,
+            "session_domain": None,
+            "session_clarity": clarity,
+            "session_momentum": momentum,
             "active_concepts": [],
-            "confusion_points": [],
+            "session_confusion_points": [],
             "message_count": 0,
         },
         "concepts": {
@@ -128,9 +128,9 @@ def _patch_session_service(mock_session_svc):
     mock_session_svc.increment_message_count = AsyncMock()
     mock_session_svc.update_session_goal = AsyncMock()
     mock_session_svc.get_session_summary = AsyncMock(return_value={
-        "goal": None, "domain": None, "clarity": 50.0,
-        "momentum": "cold_start", "active_concepts": [],
-        "confusion_points": [], "message_count": 0,
+        "session_goal": None, "session_domain": None, "session_clarity": 50.0,
+        "session_momentum": "cold_start", "active_concepts": [],
+        "session_confusion_points": [], "message_count": 0,
     })
 
 
@@ -188,6 +188,7 @@ class TestPipelineSessionContext:
         _setup_agents(orch, response="Hello learner!")
 
         result = await orch.process_message_async("user-1", "Hello")
+        await orch.wait_for_background_tasks()
 
         assert result["response"] == "Hello learner!"
         assert result["chat_id"] == "chat-123"
@@ -227,6 +228,7 @@ class TestPipelineSessionGoal:
             "user-1", "I want to learn recursion",
             session_goal="Learn recursion",
         )
+        await orch.wait_for_background_tasks()
 
         mock_session_svc.update_session_goal.assert_called_once_with(
             session_id="chat-123", user_id="user-1", goal="Learn recursion"
@@ -263,12 +265,13 @@ class TestPipelinePlannerV2:
         _setup_agents(orch, v2_context=v2_ctx, response="Great progress!")
 
         await orch.process_message_async("user-1", "Tell me more")
+        await orch.wait_for_background_tasks()
 
         orch.planner_agent.plan_response_v2.assert_called_once()
         call_args = orch.planner_agent.plan_response_v2.call_args
         passed_context = call_args[0][0]
         # Verify the session layer is in the context passed to planner
-        assert passed_context["session"]["momentum"] == "flowing"
+        assert passed_context["session"]["session_momentum"] == "flowing"
         assert "_session_id" in passed_context
         assert "_user_id" in passed_context
 
@@ -300,6 +303,7 @@ class TestPipelineMessageCount:
         _setup_agents(orch, response="Sure!")
 
         await orch.process_message_async("user-1", "Hello")
+        await orch.wait_for_background_tasks()
 
         mock_session_svc.increment_message_count.assert_called_once_with(
             session_id="chat-123"
@@ -333,6 +337,7 @@ class TestPipelineResultShape:
         _setup_agents(orch, response="Here you go!")
 
         result = await orch.process_message_async("user-1", "What is X?")
+        await orch.wait_for_background_tasks()
 
         assert "session_context" in result
         ctx = result["session_context"]
@@ -363,6 +368,7 @@ class TestPipelineResultShape:
         _setup_agents(orch, v2_context=v2_ctx, response="Let me help.")
 
         result = await orch.process_message_async("user-1", "I'm lost")
+        await orch.wait_for_background_tasks()
 
         assert result["evaluation"]["clarity_score"] == 35.0
 
@@ -397,6 +403,7 @@ class TestPipelineLegacyFallback:
         _setup_agents(orch, response="Fallback response")
 
         result = await orch.process_message_async("user-1", "Hello")
+        await orch.wait_for_background_tasks()
 
         assert result["response"] == "Fallback response"
         # Legacy planner was called, not v2

@@ -16,13 +16,14 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-from app.db.mongodb import get_user_memory_collection, get_interactions_collection
+from app.db.mongodb import get_user_memory_collection, get_interactions_collection, get_user_profiles_collection
 from app.models.memory import UserMemory
 from app.services.profile_service import profile_service
 from app.services.concept_memory_service import concept_memory_service, slugify_concept
 from app.services.session_context_service import session_context_service
 from app.services.chat_service import chat_service
 from app.services.learning_pattern_service import learning_pattern_service
+from app.services.intent_classifier_service import ProfileSignals
 from app.utils.logger import logger
 
 
@@ -85,9 +86,10 @@ class MemoryAgent:
         except Exception as e:
             logger.error("retrieve_context: session fetch failed for session=%s: %s", session_id, e)
             session = {
-                "goal": None, "domain": None, "clarity": 50.0,
-                "momentum": "cold_start", "active_concepts": [],
-                "confusion_points": [], "message_count": 0,
+                "session_goal": None, "session_domain": None, "session_clarity": 50.0,
+                "session_momentum": "cold_start", "active_concepts": [],
+                "session_confusion_points": [], "message_count": 0,
+                "session_intent": "unknown", "goal_inferred": False, "goal_confirmed": False
             }
             missing.append("session")
         timing["session_ms"] = round((time.monotonic() - t0) * 1000, 1)
@@ -169,9 +171,9 @@ class MemoryAgent:
         interests = profile.get("career_interests", [])
         interests_str = ", ".join(interests) if interests else "not specified"
 
-        goal = session.get("goal") or "not yet specified"
-        momentum = session.get("momentum", "cold_start")
-        clarity = session.get("clarity", 50.0)
+        goal = session.get("session_goal") or "not yet specified"
+        momentum = session.get("session_momentum", "cold_start")
+        clarity = session.get("session_clarity", 50.0)
 
         active_ids = list(concepts.get("active", {}).keys())
         active_str = ", ".join(active_ids) if active_ids else "none yet"
@@ -279,6 +281,56 @@ class MemoryAgent:
                 )
             except Exception as e:
                 logger.error("update_memory: profile update failed for user=%s: %s", user_id, e)
+
+    async def update_profile_signals(
+        self,
+        user_id: str,
+        signals: ProfileSignals
+    ) -> None:
+        """
+        Update UserProfile with soft signals extracted from any conversation.
+        These signals accumulate gradually and are used for user profiling,
+        not for learning assessment.
+        
+        Called regardless of session_intent — even casual sessions contribute.
+        """
+        
+        if not signals.detected_interests and not signals.vocabulary_level and not signals.implicit_goals:
+            return  # Nothing to update
+        
+        # Use MongoDB $addToSet to add new interests without creating duplicates
+        # Use $set for vocabulary and communication style (latest wins)
+        update_ops = {}
+        
+        if signals.detected_interests:
+            # Merge into career_interests list — addToSet handles deduplication
+            update_ops["$addToSet"] = {
+                "career_interests": {"$each": signals.detected_interests}
+            }
+        
+        if signals.vocabulary_level:
+            # Only update if we have high enough confidence
+            if getattr(signals, 'confidence', 0.0) >= 0.7:
+                update_ops.setdefault("$set", {})
+                update_ops["$set"]["inferred_vocabulary_level"] = signals.vocabulary_level
+        
+        if signals.implicit_goals:
+            update_ops.setdefault("$addToSet", {})
+            update_ops["$addToSet"].setdefault("implicit_career_signals", {})
+            update_ops["$addToSet"]["implicit_career_signals"] = {
+                "$each": signals.implicit_goals
+            }
+        
+        if update_ops:
+            try:
+                profiles_coll = get_user_profiles_collection()
+                await profiles_coll.update_one(
+                    {"user_id": user_id},
+                    update_ops,
+                    upsert=False
+                )
+            except Exception as e:
+                logger.warning(f"Profile signal update failed (non-critical): {e}")
 
     # =========================================================================
     # LEGACY: Preserved for backward compatibility with unmigrated call sites

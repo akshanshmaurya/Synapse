@@ -84,6 +84,12 @@ class UserProfileV2(BaseModel):
     # Concepts or skill areas where the user repeatedly struggles.
     # Triggers the planner to slow down and the executor to add scaffolding.
 
+    inferred_vocabulary_level: Optional[str] = None
+    # "basic" | "intermediate" | "technical"
+    
+    implicit_career_signals: List[str] = []
+    # soft goals detected from casual chat, capped at 20
+
     # --- Timestamps ---
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -236,6 +242,27 @@ class SessionContext(BaseModel):
     # What the user is trying to learn or accomplish in THIS chat.
     # Nullable until the planner infers it or the user states it explicitly.
     # e.g. "understand recursion", "build a REST API", "prepare for interviews"
+
+    session_intent: str = "unknown"
+    # Possible values:
+    # "unknown"         — not yet classified (first 1–2 messages)
+    # "learning"        — user is trying to understand or master something
+    # "problem_solving" — user has a specific task/problem to solve (e.g. debug this code)
+    # "casual"          — general conversation, no learning intent detected
+    # "review"          — user is explicitly revisiting something they've seen before
+
+    goal_inferred: bool = False
+    # True when session_goal was set by the system (inference), not the user.
+    # Used by the UI to show the goal as a suggestion rather than confirmed fact.
+
+    goal_confirmed: bool = False
+    # True when user has explicitly confirmed, edited, or set the goal themselves.
+    # Once True, goal_inferred is irrelevant.
+
+    intent_classified_at_message: Optional[int] = None
+    # Which message number triggered the intent classification.
+    # None = not yet classified.
+    # Stored for debugging and analytics.
 
     session_domain: Optional[str] = None
     # Inferred domain for this session, e.g. "dsa", "python", "system_design".

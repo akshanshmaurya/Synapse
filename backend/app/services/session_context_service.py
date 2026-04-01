@@ -67,6 +67,10 @@ class SessionContextService:
             session_id=session_id,
             user_id=user_id,
             session_goal=None,
+            session_intent="unknown",
+            goal_inferred=False,
+            goal_confirmed=False,
+            intent_classified_at_message=None,
             session_domain=None,
             active_concepts=[],
             session_clarity=50.0,
@@ -297,6 +301,9 @@ class SessionContextService:
             {"session_id": session_id},
             {
                 "session_goal": 1,
+                "session_intent": 1,
+                "goal_inferred": 1,
+                "goal_confirmed": 1,
                 "session_domain": 1,
                 "session_clarity": 1,
                 "session_momentum": 1,
@@ -308,24 +315,48 @@ class SessionContextService:
 
         if doc is None:
             return {
-                "goal": None,
-                "domain": None,
-                "clarity": 50.0,
-                "momentum": "cold_start",
+                "session_id": session_id,
+                "session_goal": None,
+                "session_intent": "unknown",
+                "goal_inferred": False,
+                "goal_confirmed": False,
+                "session_domain": None,
+                "session_clarity": 50.0,
+                "session_momentum": "cold_start",
                 "active_concepts": [],
-                "confusion_points": [],
+                "session_confusion_points": [],
                 "message_count": 0,
             }
 
         return {
-            "goal": doc.get("session_goal"),
-            "domain": doc.get("session_domain"),
-            "clarity": doc.get("session_clarity", 50.0),
-            "momentum": doc.get("session_momentum", "cold_start"),
+            "session_id": session_id,
+            "session_goal": doc.get("session_goal"),
+            "session_intent": doc.get("session_intent", "unknown"),
+            "goal_inferred": doc.get("goal_inferred", False),
+            "goal_confirmed": doc.get("goal_confirmed", False),
+            "session_domain": doc.get("session_domain"),
+            "session_clarity": doc.get("session_clarity", 50.0),
+            "session_momentum": doc.get("session_momentum", "cold_start"),
             "active_concepts": doc.get("active_concepts", []),
-            "confusion_points": doc.get("session_confusion_points", []),
+            "session_confusion_points": doc.get("session_confusion_points", []),
             "message_count": doc.get("message_count", 0),
         }
+
+    async def update_session(self, session_id: str, updates: dict) -> None:
+        """
+        Generic update method for a SessionContext.
+        """
+        collection = get_session_contexts_collection()
+        
+        # Don't overwrite updated_at if already there
+        if "updated_at" not in updates:
+            updates["updated_at"] = datetime.utcnow()
+            
+        await collection.update_one(
+            {"session_id": session_id},
+            {"$set": updates}
+        )
+        logger.debug(f"Updated session {session_id} with generic updates: {updates.keys()}")
 
 
 # Singleton instance — matches codebase pattern (see chat_service.py)
