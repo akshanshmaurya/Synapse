@@ -266,6 +266,34 @@ async def chat_guest_endpoint(
             response="I'm having a moment of reflection. Could you share that thought again?"
         )
 
+@app.get("/api/chats/{chat_id}/context")
+async def get_session_context(
+    chat_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Fetch the full session context for a chat — used by Session Context UI."""
+    from bson import ObjectId
+    from app.db.mongodb import get_chats_collection
+    from app.services.session_context_service import session_context_service
+
+    user_id = str(current_user["_id"])
+
+    # Verify ownership
+    try:
+        chats = get_chats_collection()
+        chat = await chats.find_one({"_id": ObjectId(chat_id)})
+        if not chat or str(chat.get("user_id")) != user_id:
+            raise HTTPException(status_code=404, detail="Chat not found or access denied")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid chat ID format")
+
+    summary = await session_context_service.get_session_summary(chat_id)
+    summary["user_id"] = user_id
+    return summary
+
+
 @app.patch("/api/chats/{chat_id}/context/goal")
 async def update_session_goal(
     chat_id: str,

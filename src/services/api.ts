@@ -1,7 +1,37 @@
 import { API_URL } from '@/config/env';
 
 
-// Chat API
+// ─── Session Context Types (Phase 6.1) ───────────────────────────────
+
+export type SessionIntent = "unknown" | "learning" | "problem_solving" | "casual" | "review";
+export type SessionMomentum = "cold_start" | "warming_up" | "flowing" | "stuck" | "wrapping_up";
+
+export interface SessionContext {
+  session_id: string;
+  user_id?: string;
+  session_goal: string | null;
+  session_domain: string | null;
+  session_intent: SessionIntent;
+  goal_inferred: boolean;
+  goal_confirmed: boolean;
+  intent_classified_at_message: number | null;
+  active_concepts: string[];
+  session_clarity: number;
+  session_confusion_points: string[];
+  message_count: number;
+  session_momentum: SessionMomentum;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SetGoalPayload {
+  goal: string;
+  confirmed?: boolean;
+  domain?: string;
+}
+
+
+// ─── Chat API ─────────────────────────────────────────────────────────
 
 interface ChatResult {
     response: string;
@@ -15,7 +45,7 @@ interface ChatResult {
 }
 
 export async function sendMessage(message: string, chatId?: string): Promise<ChatResult> {
-    const body: any = { message };
+    const body: Record<string, string> = { message };
     if (chatId) body.chat_id = chatId;
 
     const response = await fetch(`${API_URL}/api/chat`, {
@@ -42,7 +72,47 @@ export async function sendMessageWithUserId(userId: string, message: string): Pr
     return result.response;
 }
 
-// Chat History API
+
+// ─── Session Context API (Phase 6.1) ─────────────────────────────────
+
+export async function fetchChatContext(chatId: string): Promise<SessionContext | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/chats/${chatId}/context`, {
+            credentials: 'include',
+        });
+
+        if (response.status === 404) return null;
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch context: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (err) {
+        // 404 = new chat, context not yet created — that's fine
+        if (err instanceof Error && err.message.includes('404')) return null;
+        throw err;
+    }
+}
+
+export async function setSessionGoal(chatId: string, payload: SetGoalPayload): Promise<void> {
+    const response = await fetch(`${API_URL}/api/chats/${chatId}/context/goal`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            goal: payload.goal,
+            confirmed: payload.confirmed ?? true,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to set session goal: ${response.status}`);
+    }
+}
+
+
+// ─── Chat History API ─────────────────────────────────────────────────
 
 export interface ChatSession {
     _id: string;
@@ -144,7 +214,7 @@ export async function streamAudio(text: string): Promise<HTMLAudioElement | null
 }
 
 // User API
-export async function fetchUserState(): Promise<any> {
+export async function fetchUserState(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/me`, {
             credentials: 'include',
@@ -156,7 +226,7 @@ export async function fetchUserState(): Promise<any> {
     }
 }
 
-export async function fetchUserMemory(): Promise<any> {
+export async function fetchUserMemory(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/memory`, {
             credentials: 'include',
@@ -235,7 +305,7 @@ export async function updateUserProfile(interests?: string[], goals?: string[]):
 }
 
 // Roadmap API
-export async function fetchRoadmap(): Promise<any> {
+export async function fetchRoadmap(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/current`, {
             credentials: 'include',
@@ -247,9 +317,9 @@ export async function fetchRoadmap(): Promise<any> {
     }
 }
 
-export async function generateRoadmap(goal: string, context?: string): Promise<any> {
+export async function generateRoadmap(goal: string, context?: string): Promise<Record<string, unknown> | null> {
     try {
-        const body: any = { goal };
+        const body: Record<string, string> = { goal };
         if (context) body.context = context;
 
         const response = await fetch(`${API_URL}/api/roadmap/generate`, {
@@ -273,7 +343,7 @@ export async function submitRoadmapFeedback(
     message?: string,
 ): Promise<boolean> {
     try {
-        const body: any = {
+        const body: Record<string, string> = {
             step_id: stepId,
             feedback_type: feedbackType,
         };
@@ -291,7 +361,7 @@ export async function submitRoadmapFeedback(
     }
 }
 
-export async function regenerateRoadmap(roadmapId: string): Promise<any> {
+export async function regenerateRoadmap(roadmapId: string): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/regenerate/${roadmapId}`, {
             method: 'POST',
