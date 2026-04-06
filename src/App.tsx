@@ -14,6 +14,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 import RoadmapPage from "./pages/RoadmapPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import ConceptMapPage from "./pages/ConceptMapPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,11 @@ const App = () => (
             <Route path="/analytics" element={
               <ProtectedRoute>
                 <AnalyticsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/concept-map" element={
+              <ProtectedRoute>
+                <ConceptMapPage />
               </ProtectedRoute>
             } />
 

@@ -30,6 +30,42 @@ export interface SetGoalPayload {
   domain?: string;
 }
 
+// ─── Concept Map Types (Phase 6.2) ────────────────────────────────────
+
+export interface ConceptMapNode {
+  concept_id: string;
+  concept_name: string;
+  domain: string;
+  mastery_level: number;
+  exposure_count: number;
+  last_clarity_score: number;
+  misconceptions: string[];
+  first_seen: string | null;
+  last_seen: string | null;
+  mastery_history: { date: string; score: number }[];
+  status: "novice" | "developing" | "proficient" | "mastered";
+}
+
+export interface ConceptMapEdge {
+  from: string;
+  to: string;
+  type: "prerequisite";
+}
+
+export interface ConceptMapData {
+  nodes: ConceptMapNode[];
+  edges: ConceptMapEdge[];
+}
+
+export interface ZPDRecommendation {
+  concept_id: string;
+  concept_name: string;
+  domain: string;
+  mastery_level: number;
+  readiness: number;
+  reason: string;
+}
+
 
 // ─── Chat API ─────────────────────────────────────────────────────────
 
@@ -401,5 +437,33 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
         return await response.json();
     } catch {
         return null;
+    }
+}
+
+
+// ─── Concept Map API (Phase 6.2) ─────────────────────────────────────
+
+export async function fetchConceptMap(): Promise<ConceptMapData | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/user/concept-map`, {
+            credentials: 'include',
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchRecommendations(): Promise<ZPDRecommendation[]> {
+    try {
+        const response = await fetch(`${API_URL}/api/user/recommendations`, {
+            credentials: 'include',
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.recommendations || [];
+    } catch {
+        return [];
     }
 }

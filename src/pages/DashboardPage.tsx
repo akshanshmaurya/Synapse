@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Leaf, Sun, Droplets, Wind, Home, MessageSquare, Map, User, BarChart3,
-    ChevronRight, LogOut, ArrowRight, Sparkles, TrendingUp, Flame, Target, AlertTriangle
+    ChevronRight, LogOut, ArrowRight, Sparkles, TrendingUp, Flame, Target, AlertTriangle, Network
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchDashboardData, DashboardData } from "@/services/api";
@@ -43,6 +43,7 @@ export default function DashboardPage() {
         { icon: Home, label: "Garden", path: "/dashboard", active: true },
         { icon: MessageSquare, label: "Session", path: "/mentor" },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: Network, label: "Concepts", path: "/concept-map" },
         { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile" },
     ];

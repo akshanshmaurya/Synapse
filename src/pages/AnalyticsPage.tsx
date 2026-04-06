@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
     Home, MessageSquare, Map, User, BarChart3, ChevronRight,
     LogOut, TrendingUp, TrendingDown, Minus, Activity,
-    AlertTriangle, Zap, Brain, ArrowRight, Leaf
+    AlertTriangle, Zap, Brain, ArrowRight, Leaf, Network
 } from "lucide-react";
 import {
     AreaChart, Area, BarChart, Bar,
@@ -48,6 +48,7 @@ export default function AnalyticsPage() {
         { icon: Home, label: "Garden", path: "/dashboard" },
         { icon: MessageSquare, label: "Session", path: "/mentor" },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: Network, label: "Concepts", path: "/concept-map" },
         { icon: BarChart3, label: "Analytics", path: "/analytics", active: true },
         { icon: User, label: "Roots", path: "/profile" },
     ];

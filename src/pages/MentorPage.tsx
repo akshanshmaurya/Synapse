@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, AlertTriangle, RefreshCw, Sparkles, TrendingUp, Activity } from "lucide-react";
+import { Leaf, Volume2, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, AlertTriangle, RefreshCw, Sparkles, TrendingUp, Activity, Network } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -223,6 +223,7 @@ export default function MentorPage() {
         { icon: Home, label: "Garden", path: "/dashboard" },
         { icon: MessageSquare, label: "Session", path: "/mentor", active: true },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: Network, label: "Concepts", path: "/concept-map" },
         { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile" },
     ];

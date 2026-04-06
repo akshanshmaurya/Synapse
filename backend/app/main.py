@@ -349,6 +349,114 @@ async def tts_endpoint(request: TTSRequest):
     return Response(content=audio_content, media_type="audio/mpeg")
 
 
+# --- Concept Map Endpoints ---
+
+@app.get("/api/user/concept-map")
+async def get_concept_map(current_user: dict = Depends(get_current_user)):
+    """Return all user concepts as nodes and inferred prerequisite edges for graph visualization."""
+    from app.services.concept_memory_service import concept_memory_service
+
+    user_id = str(current_user["_id"])
+    user_concepts = await concept_memory_service.get_user_concepts(user_id)
+    concepts = user_concepts.concepts or {}
+
+    nodes = []
+    edges = []
+
+    for cid, record in concepts.items():
+        status = "mastered" if record.mastery_level >= 0.85 else \
+                 "proficient" if record.mastery_level >= 0.6 else \
+                 "developing" if record.mastery_level >= 0.3 else "novice"
+        nodes.append({
+            "concept_id": cid,
+            "concept_name": record.concept_name,
+            "domain": record.domain,
+            "mastery_level": round(record.mastery_level, 3),
+            "exposure_count": record.exposure_count,
+            "last_clarity_score": record.last_clarity_score,
+            "misconceptions": record.misconceptions[:5] if record.misconceptions else [],
+            "first_seen": record.first_seen.isoformat() if record.first_seen else None,
+            "last_seen": record.last_seen.isoformat() if record.last_seen else None,
+            "mastery_history": [
+                {"date": s.date.isoformat(), "score": round(s.score, 3)}
+                for s in (record.mastery_history or [])[-10:]
+            ],
+            "status": status,
+        })
+
+    # Build prerequisite edges: within the same domain, lower-mastery concepts
+    # that were first seen before higher-mastery ones are inferred prerequisites.
+    domain_groups: dict = {}
+    for node in nodes:
+        domain_groups.setdefault(node["domain"], []).append(node)
+
+    for domain, group in domain_groups.items():
+        sorted_by_time = sorted(group, key=lambda n: n["first_seen"] or "")
+        for i in range(len(sorted_by_time) - 1):
+            # Only create prerequisite edge if the earlier concept has some mastery
+            earlier = sorted_by_time[i]
+            later = sorted_by_time[i + 1]
+            if earlier["mastery_level"] > 0.1:
+                edges.append({
+                    "from": earlier["concept_id"],
+                    "to": later["concept_id"],
+                    "type": "prerequisite",
+                })
+
+    return {"nodes": nodes, "edges": edges}
+
+
+@app.get("/api/user/recommendations")
+async def get_zpd_recommendations(current_user: dict = Depends(get_current_user)):
+    """Return ZPD-based learning recommendations — concepts the user is ready to learn."""
+    from app.services.concept_memory_service import concept_memory_service
+
+    user_id = str(current_user["_id"])
+    user_concepts = await concept_memory_service.get_user_concepts(user_id)
+    concepts = user_concepts.concepts or {}
+
+    if not concepts:
+        return {"recommendations": []}
+
+    weak = await concept_memory_service.get_weak_concepts(user_id, threshold=0.6)
+
+    recommendations = []
+    for record in weak[:6]:
+        # Compute readiness — higher if prerequisite concepts in same domain are strong
+        domain_peers = [
+            v for v in concepts.values()
+            if v.domain == record.domain and v.concept_id != record.concept_id
+        ]
+        avg_peer_mastery = (
+            sum(p.mastery_level for p in domain_peers) / len(domain_peers)
+            if domain_peers else 0.0
+        )
+
+        # ZPD readiness: higher peer mastery + some exposure = more ready
+        readiness = min(1.0, avg_peer_mastery * 0.6 + min(record.exposure_count, 5) * 0.08)
+
+        reason = (
+            f"You have strong foundations in related {record.domain} concepts"
+            if avg_peer_mastery > 0.5
+            else f"You've seen this {record.exposure_count} times — keep going"
+            if record.exposure_count > 1
+            else "A natural next step based on your learning path"
+        )
+
+        recommendations.append({
+            "concept_id": record.concept_id,
+            "concept_name": record.concept_name,
+            "domain": record.domain,
+            "mastery_level": round(record.mastery_level, 3),
+            "readiness": round(readiness, 3),
+            "reason": reason,
+        })
+
+    # Sort by readiness descending, take top 3
+    recommendations.sort(key=lambda r: r["readiness"], reverse=True)
+    return {"recommendations": recommendations[:3]}
+
+
 # --- User Endpoints ---
 
 @app.get("/api/user/me")

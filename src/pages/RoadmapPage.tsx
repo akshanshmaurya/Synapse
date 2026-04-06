@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Home, MessageSquare, Map, User, BarChart3, LogOut, ChevronRight, Compass, HelpCircle, RefreshCw, Check, ArrowRight, AlertTriangle } from "lucide-react";
+import { Home, MessageSquare, Map, User, BarChart3, LogOut, ChevronRight, Compass, HelpCircle, RefreshCw, Check, ArrowRight, AlertTriangle, Network } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_URL } from "@/config/env";
 
@@ -48,6 +48,7 @@ export default function RoadmapPage() {
         { icon: Home, label: "Garden", path: "/dashboard" },
         { icon: MessageSquare, label: "Session", path: "/mentor" },
         { icon: Map, label: "Pathways", path: "/roadmap", active: true },
+        { icon: Network, label: "Concepts", path: "/concept-map" },
         { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile" },
     ];

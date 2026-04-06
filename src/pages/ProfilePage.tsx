@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Sprout, Home, MessageSquare, Map, User, BarChart3, Shield, Edit3, X, Plus, Check, LogOut, ArrowRight } from "lucide-react";
+import { Leaf, Sprout, Home, MessageSquare, Map, User, BarChart3, Shield, Edit3, X, Plus, Check, LogOut, ArrowRight, Network } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchUserMemory, updateUserProfile } from "@/services/api";
 
@@ -73,6 +73,7 @@ export default function ProfilePage() {
         { icon: Home, label: "Garden", path: "/dashboard" },
         { icon: MessageSquare, label: "Session", path: "/mentor" },
         { icon: Map, label: "Pathways", path: "/roadmap" },
+        { icon: Network, label: "Concepts", path: "/concept-map" },
         { icon: BarChart3, label: "Analytics", path: "/analytics" },
         { icon: User, label: "Roots", path: "/profile", active: true },
     ];
