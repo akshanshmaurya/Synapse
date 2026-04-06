@@ -27,8 +27,14 @@ const makeContext = (overrides: Partial<SessionContext> = {}): SessionContext =>
     session_goal: null,
     session_domain: null,
     session_intent: "learning",
-    momentum: null,
+    session_momentum: "cold_start",
     message_count: 5,
+    goal_inferred: false,
+    goal_confirmed: false,
+    intent_classified_at_message: null,
+    active_concepts: [],
+    session_clarity: 0,
+    session_confusion_points: [],
     ...overrides,
 });
 
