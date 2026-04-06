@@ -462,8 +462,55 @@ export async function fetchRecommendations(): Promise<ZPDRecommendation[]> {
         });
         if (!response.ok) return [];
         const data = await response.json();
-        return data.recommendations || [];
+        return data.recommendations || data.next_steps || [];
     } catch {
         return [];
     }
 }
+
+// ─── Dashboard Recommendations (Phase 6.3) ───────────────────────────
+
+export interface VelocityData {
+    label: "fast" | "steady" | "slow" | "insufficient_data";
+    trend: "improving" | "stable" | "declining";
+    insight: string;
+    mastered_count: number;
+    in_progress_count: number;
+    mastery_sparkline: number[];
+}
+
+export interface RecentSession {
+    session_id: string;
+    date: string;
+    goal: string | null;
+    effectiveness: "good" | "moderate" | "low";
+    concepts_improved: string[];
+}
+
+export interface DashboardRecommendationsData {
+    velocity: VelocityData;
+    next_steps: ZPDRecommendation[];
+    recent_sessions: RecentSession[];
+}
+
+export async function fetchDashboardRecommendations(): Promise<DashboardRecommendationsData | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/user/recommendations`, {
+            credentials: 'include',
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return {
+            velocity: data.velocity || {
+                label: "insufficient_data", trend: "stable",
+                insight: "Start learning to see your velocity.",
+                mastered_count: 0, in_progress_count: 0, mastery_sparkline: [],
+            },
+            next_steps: data.next_steps || data.recommendations || [],
+            recent_sessions: data.recent_sessions || [],
+        };
+    } catch {
+        return null;
+    }
+}
+

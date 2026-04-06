@@ -408,53 +408,147 @@ async def get_concept_map(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/recommendations")
 async def get_zpd_recommendations(current_user: dict = Depends(get_current_user)):
-    """Return ZPD-based learning recommendations — concepts the user is ready to learn."""
+    """Return ZPD recommendations, learning velocity, and recent session history."""
     from app.services.concept_memory_service import concept_memory_service
+    from app.db.mongodb import get_chats_collection, get_session_contexts_collection
+    from datetime import datetime, timedelta
 
     user_id = str(current_user["_id"])
     user_concepts = await concept_memory_service.get_user_concepts(user_id)
     concepts = user_concepts.concepts or {}
 
-    if not concepts:
-        return {"recommendations": []}
+    # ── 1. Next Steps (ZPD recommendations) ─────────────────────────────
+    next_steps = []
+    if concepts:
+        weak = await concept_memory_service.get_weak_concepts(user_id, threshold=0.6)
+        for record in weak[:6]:
+            domain_peers = [
+                v for v in concepts.values()
+                if v.domain == record.domain and v.concept_id != record.concept_id
+            ]
+            avg_peer_mastery = (
+                sum(p.mastery_level for p in domain_peers) / len(domain_peers)
+                if domain_peers else 0.0
+            )
+            readiness = min(1.0, avg_peer_mastery * 0.6 + min(record.exposure_count, 5) * 0.08)
+            reason = (
+                f"You have strong foundations in related {record.domain} concepts"
+                if avg_peer_mastery > 0.5
+                else f"You've seen this {record.exposure_count} times — keep going"
+                if record.exposure_count > 1
+                else "A natural next step based on your learning path"
+            )
+            next_steps.append({
+                "concept_id": record.concept_id,
+                "concept_name": record.concept_name,
+                "domain": record.domain,
+                "mastery_level": round(record.mastery_level, 3),
+                "readiness": round(readiness, 3),
+                "reason": reason,
+            })
+        next_steps.sort(key=lambda r: r["readiness"], reverse=True)
+        next_steps = next_steps[:3]
 
-    weak = await concept_memory_service.get_weak_concepts(user_id, threshold=0.6)
+    # ── 2. Learning Velocity ────────────────────────────────────────────
+    mastered_count = sum(1 for c in concepts.values() if c.mastery_level >= 0.85)
+    in_progress_count = sum(1 for c in concepts.values() if 0.1 <= c.mastery_level < 0.85)
+    all_mastery = [c.mastery_level for c in concepts.values()]
+    avg_mastery = sum(all_mastery) / len(all_mastery) if all_mastery else 0.0
 
-    recommendations = []
-    for record in weak[:6]:
-        # Compute readiness — higher if prerequisite concepts in same domain are strong
-        domain_peers = [
-            v for v in concepts.values()
-            if v.domain == record.domain and v.concept_id != record.concept_id
-        ]
-        avg_peer_mastery = (
-            sum(p.mastery_level for p in domain_peers) / len(domain_peers)
-            if domain_peers else 0.0
+    # Build a 7-day sparkline from mastery history across all concepts
+    now = datetime.utcnow()
+    sparkline = []
+    for days_ago in range(6, -1, -1):
+        day = (now - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        day_scores = []
+        for c in concepts.values():
+            history = getattr(c, "mastery_history", []) or []
+            for h in history:
+                h_date = h.get("date", "") if isinstance(h, dict) else ""
+                if h_date == day:
+                    day_scores.append(h.get("score", 0) if isinstance(h, dict) else 0)
+        sparkline.append(round(sum(day_scores) / len(day_scores), 3) if day_scores else None)
+
+    # Fill None with previous value for continuity
+    for i in range(len(sparkline)):
+        if sparkline[i] is None:
+            sparkline[i] = sparkline[i - 1] if i > 0 and sparkline[i - 1] is not None else 0.0
+
+    # Velocity label + trend
+    if len(all_mastery) < 3:
+        vel_label, vel_trend = "insufficient_data", "stable"
+        vel_insight = "Keep learning — we need a few more sessions to map your pace."
+    else:
+        recent_vals = [v for v in sparkline[-3:] if v and v > 0]
+        older_vals = [v for v in sparkline[:4] if v and v > 0]
+        recent_avg = sum(recent_vals) / len(recent_vals) if recent_vals else 0
+        older_avg = sum(older_vals) / len(older_vals) if older_vals else 0
+        delta = recent_avg - older_avg
+
+        if avg_mastery >= 0.7:
+            vel_label = "fast"
+        elif avg_mastery >= 0.4:
+            vel_label = "steady"
+        else:
+            vel_label = "slow"
+
+        if delta > 0.05:
+            vel_trend = "improving"
+        elif delta < -0.05:
+            vel_trend = "declining"
+        else:
+            vel_trend = "stable"
+
+        vel_insight = (
+            f"You've mastered {mastered_count} concepts with {in_progress_count} in progress — "
+            + ("strong momentum, keep pushing!" if vel_label == "fast"
+               else "steady growth, you're on track." if vel_label == "steady"
+               else "take your time, depth matters more than speed.")
         )
 
-        # ZPD readiness: higher peer mastery + some exposure = more ready
-        readiness = min(1.0, avg_peer_mastery * 0.6 + min(record.exposure_count, 5) * 0.08)
+    velocity = {
+        "label": vel_label,
+        "trend": vel_trend,
+        "insight": vel_insight,
+        "mastered_count": mastered_count,
+        "in_progress_count": in_progress_count,
+        "mastery_sparkline": sparkline,
+    }
 
-        reason = (
-            f"You have strong foundations in related {record.domain} concepts"
-            if avg_peer_mastery > 0.5
-            else f"You've seen this {record.exposure_count} times — keep going"
-            if record.exposure_count > 1
-            else "A natural next step based on your learning path"
-        )
+    # ── 3. Recent Sessions ──────────────────────────────────────────────
+    recent_sessions = []
+    try:
+        ctx_collection = get_session_contexts_collection()
+        cursor = ctx_collection.find(
+            {"user_id": user_id}
+        ).sort("updated_at", -1).limit(5)
 
-        recommendations.append({
-            "concept_id": record.concept_id,
-            "concept_name": record.concept_name,
-            "domain": record.domain,
-            "mastery_level": round(record.mastery_level, 3),
-            "readiness": round(readiness, 3),
-            "reason": reason,
-        })
+        async for doc in cursor:
+            goal = doc.get("session_goal")
+            clarity = doc.get("session_clarity", 0)
+            effectiveness = (
+                "good" if clarity >= 70
+                else "moderate" if clarity >= 40
+                else "low"
+            )
+            active = doc.get("active_concepts", [])
+            recent_sessions.append({
+                "session_id": doc.get("session_id", ""),
+                "date": doc.get("updated_at", doc.get("created_at", "")),
+                "goal": goal,
+                "effectiveness": effectiveness,
+                "concepts_improved": active[:5] if active else [],
+            })
+    except Exception as e:
+        logger.warning(f"Failed to fetch recent sessions: {e}")
 
-    # Sort by readiness descending, take top 3
-    recommendations.sort(key=lambda r: r["readiness"], reverse=True)
-    return {"recommendations": recommendations[:3]}
+    return {
+        "next_steps": next_steps,
+        "velocity": velocity,
+        "recent_sessions": recent_sessions,
+        # Keep backwards compat alias
+        "recommendations": next_steps,
+    }
 
 
 # --- User Endpoints ---
