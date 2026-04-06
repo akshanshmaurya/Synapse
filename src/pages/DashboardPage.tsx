@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchDashboardData, fetchDashboardRecommendations } from "@/services/api";
 import type { DashboardData, DashboardRecommendationsData } from "@/services/api";
+import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
 
 import {
     MomentumHero,
@@ -157,12 +158,7 @@ export default function DashboardPage() {
                         </motion.header>
 
                         {isLoading ? (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 gap-4">
-                                <div className="w-14 h-14 rounded-full bg-[#5C6B4A] flex items-center justify-center shadow-[0_10px_30px_rgba(92,107,74,0.2)]">
-                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                </div>
-                                <span className="mono-tag text-[10px] text-[#8B8178]">Growing your garden...</span>
-                            </motion.div>
+                            <DashboardSkeleton />
                         ) : error ? (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                 className="flex flex-col items-center justify-center py-32 gap-5 text-center px-4">

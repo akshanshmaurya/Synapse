@@ -1,13 +1,21 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Activity, Brain, Database, FileText, HardDrive, Terminal, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Activity, Brain, Database, FileText, HardDrive, Terminal, ChevronDown } from 'lucide-react';
 import { API_URL } from '@/config/env';
+import { useAuth } from '@/contexts/AuthContext';
+import ErrorBoundary from './ErrorBoundary';
+
+interface TraceDetails {
+    strategy?: string;
+    clarity_score?: number;
+    [key: string]: unknown;
+}
 
 interface Trace {
     trace_id: string;
     request_id: string;
     agent: string;
     action: string;
-    details: any;
+    details: TraceDetails | null;
     timestamp: string;
     input_summary?: string;
     decision?: string;
@@ -19,30 +27,35 @@ interface CognitiveTracePanelProps {
     sessionId?: string | null;
 }
 
-export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelProps) {
+function CognitiveTracePanelInner({ sessionId }: CognitiveTracePanelProps) {
+    const { user } = useAuth();
     const [traces, setTraces] = useState<Trace[]>([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [lastFetch, setLastFetch] = useState(Date.now());
+    const [authError, setAuthError] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Admin role check — only render the panel for admin users
+    // The /api/traces endpoint is admin-only; bail early for regular users
+    const isAdmin = user?.email?.endsWith('@synapse.admin') || false;
+
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || !isAdmin) return;
 
         const fetchTraces = async () => {
             try {
-                // Add trailing slash to avoid 307 redirect
-                const url = sessionId 
+                const url = sessionId
                     ? `${API_URL}/api/traces/?limit=20&session_id=${sessionId}`
                     : `${API_URL}/api/traces/?limit=20`;
 
-                const res = await fetch(url, {
-                    credentials: "include"
-                });
+                const res = await fetch(url, { credentials: "include" });
+
+                if (res.status === 401 || res.status === 403) {
+                    setAuthError(true);
+                    return;
+                }
+
                 if (res.ok) {
-                    const data = await res.json();
-
-
-                    // Only update if differrent
+                    const data: Trace[] = await res.json();
                     setTraces(prev => {
                         if (JSON.stringify(prev) !== JSON.stringify(data)) {
                             return data;
@@ -55,11 +68,16 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
             }
         };
 
-        const interval = setInterval(fetchTraces, 2000); // Poll every 2s
+        const interval = setInterval(fetchTraces, 2000);
         fetchTraces();
-
         return () => clearInterval(interval);
-    }, [isOpen, sessionId]);
+    }, [isOpen, sessionId, isAdmin]);
+
+    // Don't render for non-admin users
+    if (!isAdmin) return null;
+
+    // Auth error state
+    if (authError) return null;
 
     const getAgentIcon = (agent: string) => {
         switch (agent) {
@@ -83,6 +101,17 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
         }
     };
 
+    const getAgentTextColor = (agent: string) => {
+        switch (agent) {
+            case 'Planner': return 'text-blue-400';
+            case 'Executor': return 'text-green-400';
+            case 'Evaluator': return 'text-purple-400';
+            case 'Memory': return 'text-yellow-400';
+            case 'Persistence': return 'text-red-400';
+            default: return 'text-gray-300';
+        }
+    };
+
     if (!isOpen) {
         return (
             <button
@@ -102,11 +131,9 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
                     <Terminal size={14} className="text-[#5C6B4A]" />
                     <span className="text-[#5C6B4A] font-bold tracking-wider">SYSTEM ACTIVITY</span>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setIsOpen(false)} className="text-[#5C6B4A] hover:text-white">
-                        <ChevronDown size={16} />
-                    </button>
-                </div>
+                <button onClick={() => setIsOpen(false)} className="text-[#5C6B4A] hover:text-white">
+                    <ChevronDown size={16} />
+                </button>
             </div>
 
             {/* Logs */}
@@ -119,16 +146,9 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
                     <div key={trace.trace_id} className={`p-2 rounded border ${getAgentColor(trace.agent)} transition-all hover:opacity-100 opacity-90`}>
                         <div className="flex items-center gap-2 mb-1">
                             {getAgentIcon(trace.agent)}
-                            <span className={`font-bold tracking-wider ${trace.agent === 'Evaluator' ? 'text-purple-400' :
-                                trace.agent === 'Planner' ? 'text-blue-400' :
-                                    trace.agent === 'Persistence' ? 'text-red-400' :
-                                        trace.agent === 'Memory' ? 'text-yellow-400' :
-                                            trace.agent === 'Executor' ? 'text-green-400' :
-                                                'text-gray-300'
-                                }`}>
+                            <span className={`font-bold tracking-wider ${getAgentTextColor(trace.agent)}`}>
                                 {trace.agent.toUpperCase()}
                             </span>
-                            {/* Explicit DB Tagging */}
                             {(trace.agent === 'Persistence' || trace.agent === 'Memory') && (
                                 <>
                                     {(trace.action.includes('Saved') || trace.action.includes('Updated')) && (
@@ -148,35 +168,30 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
                             </span>
                         </div>
                         <div className="text-white mb-2 font-bold text-sm tracking-tight">{trace.action}</div>
-                        
+
                         <div className="mt-1 pl-2 border-l border-[#5C6B4A]/40 space-y-1">
                             {trace.decision && (
                                 <div className="text-gray-300 text-xs truncate">
-                                    <span className="text-gray-500 font-semibold mr-1">Decision:</span>
-                                    {trace.decision}
+                                    <span className="text-gray-500 font-semibold mr-1">Decision:</span>{trace.decision}
                                 </div>
                             )}
                             {trace.reasoning && (
                                 <div className="text-gray-300 text-xs truncate">
-                                    <span className="text-gray-500 font-semibold mr-1">Reasoning:</span>
-                                    {trace.reasoning}
+                                    <span className="text-gray-500 font-semibold mr-1">Reasoning:</span>{trace.reasoning}
                                 </div>
                             )}
                             {trace.output_summary && (
                                 <div className="text-gray-300 text-xs truncate">
-                                    <span className="text-gray-500 font-semibold mr-1">Outcome:</span>
-                                    {trace.output_summary}
+                                    <span className="text-gray-500 font-semibold mr-1">Outcome:</span>{trace.output_summary}
                                 </div>
                             )}
-                            
-                            {/* Fallback for legacy items without observability fields */}
                             {(!trace.decision && !trace.reasoning && !trace.output_summary && trace.details) && (
                                 <div className="text-gray-400 text-xs truncate">
-                                    {trace.agent === 'Planner' && trace.details.strategy 
-                                        ? `selected strategy: "${trace.details.strategy}"` 
+                                    {trace.agent === 'Planner' && trace.details.strategy
+                                        ? `selected strategy: "${trace.details.strategy}"`
                                         : trace.agent === 'Evaluator' && trace.details.clarity_score !== undefined
                                         ? `clarity: ${trace.details.clarity_score}%`
-                                        : trace.agent === 'Executor' 
+                                        : trace.agent === 'Executor'
                                         ? `generated response`
                                         : JSON.stringify(trace.details)}
                                 </div>
@@ -191,5 +206,13 @@ export default function CognitiveTracePanel({ sessionId }: CognitiveTracePanelPr
                 <span className="text-green-500">● ONLINE</span>
             </div>
         </div>
+    );
+}
+
+export default function CognitiveTracePanel(props: CognitiveTracePanelProps) {
+    return (
+        <ErrorBoundary fallbackTitle="Trace panel unavailable">
+            <CognitiveTracePanelInner {...props} />
+        </ErrorBoundary>
     );
 }

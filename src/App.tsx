@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import LandingPage from "./pages/LandingPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
@@ -28,47 +29,47 @@ const App = () => (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<SignInPage />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/" element={<ErrorBoundary><LandingPage /></ErrorBoundary>} />
+            <Route path="/login" element={<ErrorBoundary><SignInPage /></ErrorBoundary>} />
+            <Route path="/signin" element={<ErrorBoundary><SignInPage /></ErrorBoundary>} />
+            <Route path="/signup" element={<ErrorBoundary><SignUpPage /></ErrorBoundary>} />
 
             {/* Onboarding - requires auth but not onboarding completion */}
             <Route path="/onboarding" element={
               <ProtectedRoute requireOnboarding={false}>
-                <OnboardingPage />
+                <ErrorBoundary><OnboardingPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
 
             {/* Protected routes - require auth AND onboarding completion */}
             <Route path="/mentor" element={
               <ProtectedRoute>
-                <MentorPage />
+                <ErrorBoundary><MentorPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <DashboardPage />
+                <ErrorBoundary><DashboardPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
               <ProtectedRoute>
-                <ProfilePage />
+                <ErrorBoundary><ProfilePage /></ErrorBoundary>
               </ProtectedRoute>
             } />
             <Route path="/roadmap" element={
               <ProtectedRoute>
-                <RoadmapPage />
+                <ErrorBoundary><RoadmapPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
             <Route path="/analytics" element={
               <ProtectedRoute>
-                <AnalyticsPage />
+                <ErrorBoundary><AnalyticsPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
             <Route path="/concept-map" element={
               <ProtectedRoute>
-                <ConceptMapPage />
+                <ErrorBoundary><ConceptMapPage /></ErrorBoundary>
               </ProtectedRoute>
             } />
 
