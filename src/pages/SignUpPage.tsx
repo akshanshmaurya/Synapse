@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 /* ──────────────────────────────────────────────
    Animation Presets (matches Landing Page)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
 const stagger = {
     container: { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } },
     item: {
@@ -46,8 +46,8 @@ export default function SignUpPage() {
         try {
             await signup(email, password, name);
             navigate("/onboarding");
-        } catch (err: any) {
-            setError(err.message || "Something went wrong. Please try again.");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
         } finally {
             setIsLoading(false);
         }

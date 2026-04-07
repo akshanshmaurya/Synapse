@@ -9,7 +9,7 @@
     <a href="https://github.com/akshanshmaurya/Synapse/actions/workflows/ci.yml">
       <img src="https://github.com/akshanshmaurya/Synapse/actions/workflows/ci.yml/badge.svg" alt="CI" />
     </a>
-    <img src="https://img.shields.io/badge/Tests-156_passing-brightgreen" alt="Tests" />
+    <img src="https://img.shields.io/badge/Tests-154_passing-brightgreen" alt="Tests" />
     <img src="https://img.shields.io/badge/Coverage-improving-yellow" alt="Coverage" />
   </p>
 

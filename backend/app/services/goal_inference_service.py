@@ -29,9 +29,19 @@ class GoalInferenceResult:
     goal_type: str
 
 class GoalInferenceService:
+    """Infers a learning goal from the user's initial messages when none is explicitly set.
+
+    Uses a three-step pipeline:
+        1. Deterministic domain detection via keyword matching
+        2. Deterministic goal-type classification (interview_prep, concept_learning, etc.)
+        3. Single LLM pass to generate a concise, specific goal sentence
+
+    Triggered exactly once per session at message_count == 3 (via should_infer()).
+    """
+
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = settings.GEMINI_MODEL
 
     def infer_goal(self, session_history: List[str], session_domain: Optional[str]) -> GoalInferenceResult:
         """

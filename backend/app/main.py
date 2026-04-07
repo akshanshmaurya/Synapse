@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
+import uuid
 
 from app.core.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
@@ -255,9 +256,7 @@ async def chat_guest_endpoint(
 ):
     """Guest chat — rate limited to 10/min, no auth required."""
     try:
-        import os
-
-        user_id = guest_id or f"guest_{os.urandom(8).hex()}"
+        user_id = guest_id or f"guest_{uuid.uuid4().hex}"
         response_text = await orchestrator.process_message_async(user_id, body.message)
         return ChatResponse(response=response_text)
     except Exception as e:

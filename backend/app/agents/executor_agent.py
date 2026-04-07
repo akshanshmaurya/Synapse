@@ -14,6 +14,7 @@ import json
 import uuid
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
+from app.services.llm_utils import strip_json_fences
 from app.utils.logger import logger
 
 class ExecutorAgent:
@@ -83,7 +84,7 @@ Respond now (max {max_lines} lines):"""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt
             )
             return response.text.strip()
@@ -118,7 +119,7 @@ Voice response:"""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt
             )
             return response.text.strip()
@@ -212,20 +213,12 @@ RESPOND ONLY WITH VALID JSON."""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt
             )
-            text = response.text.strip()
+            text = strip_json_fences(response.text.strip())
             
-            # Clean JSON
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            
-            roadmap = json.loads(text.strip())
+            roadmap = json.loads(text)
             
             # Ensure all IDs are unique and structure is complete
             total_steps = 0
@@ -330,19 +323,12 @@ RESPOND ONLY WITH VALID JSON."""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt
             )
-            text = response.text.strip()
+            text = strip_json_fences(response.text.strip())
             
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            
-            roadmap = json.loads(text.strip())
+            roadmap = json.loads(text)
             
             # Ensure IDs
             for i, stage in enumerate(roadmap.get("stages", [])):

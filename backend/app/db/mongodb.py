@@ -89,6 +89,22 @@ class MongoDB:
             roadmaps = cls.db["roadmaps"]
             await roadmaps.create_index("user_id")
 
+            # Roadmap Feedback
+            roadmap_feedback = cls.db["roadmap_feedback"]
+            await roadmap_feedback.create_index([("user_id", 1), ("roadmap_id", 1)])
+
+            # Agent Logs
+            agent_logs = cls.db["agent_logs"]
+            await agent_logs.create_index([("user_id", 1), ("timestamp", -1)])
+
+            # User Memory (legacy flat memory)
+            user_memory = cls.db["user_memory"]
+            await user_memory.create_index("user_id", unique=True)
+
+            # Interactions
+            interactions = cls.db["interactions"]
+            await interactions.create_index([("user_id", 1), ("timestamp", -1)])
+
             # ------------------------------------------------------------------
             # Phase 4.7: Three-Layer Memory Collections
             # ------------------------------------------------------------------
@@ -118,11 +134,24 @@ class MongoDB:
             )
             # For fetching all sessions belonging to a user
             await session_contexts.create_index("user_id")
-            # TTL: auto-delete sessions inactive for 30 days (2,592,000 seconds)
-            # Sessions shouldn't live forever — 30 days is generous for users who take breaks
+            # TTL: auto-delete sessions inactive for N days (configurable)
             await session_contexts.create_index(
-                "updated_at", expireAfterSeconds=2_592_000
+                "updated_at",
+                expireAfterSeconds=settings.SESSION_CONTEXT_TTL_DAYS * 86_400,
             )
+
+            # ------------------------------------------------------------------
+            # Observability & Analytics
+            # ------------------------------------------------------------------
+
+            # System Traces (Cognitive Trace Panel)
+            system_traces = cls.db["system_traces"]
+            await system_traces.create_index([("user_id", 1), ("session_id", 1)])
+            await system_traces.create_index("timestamp", expireAfterSeconds=30 * 86_400)
+
+            # Learning Analyses (Phase 5.4B — periodic pattern analysis logs)
+            learning_analyses = cls.db["learning_analyses"]
+            await learning_analyses.create_index([("user_id", 1), ("created_at", -1)])
 
             logger.info("Database indexes successfully verified/created.")
         except Exception as e:
@@ -180,3 +209,11 @@ def get_concept_memory_collection():
 def get_session_contexts_collection():
     """Layer 3 — Working Memory (one per chat session, TTL 30 days)"""
     return MongoDB.get_db()["session_contexts"]
+
+def get_system_traces_collection():
+    """Cognitive Trace Panel — structured pipeline observability logs"""
+    return MongoDB.get_db()["system_traces"]
+
+def get_learning_analyses_collection():
+    """Phase 5.4B — periodic learning pattern analysis records"""
+    return MongoDB.get_db()["learning_analyses"]

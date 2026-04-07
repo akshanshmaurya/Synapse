@@ -13,6 +13,7 @@ import json
 from typing import Dict, Any, Optional
 from app.core.config import settings
 from app.services.session_context_service import session_context_service
+from app.services.llm_utils import strip_json_fences
 from app.utils.logger import logger
 
 def compute_deterministic_strategy(context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -308,20 +309,12 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt,
             )
-            text = response.text.strip()
+            text = strip_json_fences(response.text.strip())
 
-            # Clean markdown fences
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-
-            strategy = json.loads(text.strip())
+            strategy = json.loads(text)
         except json.JSONDecodeError as e:
             logger.warning("Planner JSON error: %s", e)
             strategy = self._default_strategy_v2()
@@ -488,19 +481,12 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt,
             )
-            text = response.text.strip()
+            text = strip_json_fences(response.text.strip())
 
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-
-            return json.loads(text.strip())
+            return json.loads(text)
         except json.JSONDecodeError as e:
             logger.warning("Planner JSON error: %s", e)
             return self._default_strategy()
@@ -545,19 +531,12 @@ RESPOND ONLY WITH VALID JSON."""
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=prompt,
             )
-            text = response.text.strip()
+            text = strip_json_fences(response.text.strip())
 
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-
-            return json.loads(text.strip())
+            return json.loads(text)
         except Exception as e:
             logger.error("Planner roadmap error: %s", e)
             return {

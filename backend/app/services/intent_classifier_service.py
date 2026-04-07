@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from google import genai
 from app.core.config import settings
-from app.services.llm_utils import generate_with_retry
+from app.services.llm_utils import generate_with_retry, strip_json_fences
 from app.models.memory_v2 import SessionContext
 
 logger = logging.getLogger(__name__)
@@ -64,10 +64,20 @@ class ProfileSignals:
     confidence: float
 
 class IntentClassifierService:
+    """Classifies chat messages into learning intents to control evaluator behavior.
+
+    Uses a three-tier classification pipeline:
+        1. Heuristic guard (skip if < 3 messages)
+        2. Deterministic keyword matching against curated domain vocabularies
+        3. LLM fallback for ambiguous messages
+
+    Also extracts soft profile signals (interests, goals, vocabulary level)
+    from user messages without LLM calls.
+    """
+
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        # Using 2.5 flash as standard fast generic model since standard LLM calls in this codebase use it (like planner agent).
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = settings.GEMINI_MODEL
 
     def classify(self, message: str, message_count: int, session_history: List[str]) -> IntentResult:
         """
@@ -126,15 +136,9 @@ review: explicitly revisiting previously discussed content"""
                 contents=prompt
             )
             if response and response.text:
-                text = response.text.strip()
-                if text.startswith("```json"):
-                    text = text[7:]
-                if text.startswith("```"):
-                    text = text[3:]
-                if text.endswith("```"):
-                    text = text[:-3]
+                text = strip_json_fences(response.text.strip())
                 
-                data = json.loads(text.strip())
+                data = json.loads(text)
                 result = IntentResult(
                     intent=data.get("intent", "learning"),
                     confidence=float(data.get("confidence", 0.5)),

@@ -26,6 +26,16 @@ class Settings(BaseSettings):
 
     # --- AI / LLM ---
     GEMINI_API_KEY: str  # No default — must be set in .env
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # --- Pipeline Limits ---
+    # Max items kept in capped arrays (MongoDB $slice)
+    MAX_EVALUATION_HISTORY: int = 20
+    MAX_SESSION_DATES: int = 100
+    MAX_RECENT_MESSAGES: int = 10
+    MAX_STRUGGLES: int = 20
+    # Session context TTL in days (MongoDB TTL index)
+    SESSION_CONTEXT_TTL_DAYS: int = 30
 
     # --- External Services ---
     ELEVENLABS_API_KEY: str = ""  # Optional — TTS won't work without it

@@ -38,3 +38,18 @@ def generate_with_retry(client, model, contents, config=None, retries=3, initial
                      continue
                 raise e # Raise non-transient errors
     return None
+
+
+def strip_json_fences(text: str) -> str:
+    """Remove markdown JSON fences (```json ... ```) from LLM output.
+
+    Handles common LLM response patterns where JSON is wrapped in fenced
+    code blocks. Safe to call on already-clean text (returns it unchanged).
+    """
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()

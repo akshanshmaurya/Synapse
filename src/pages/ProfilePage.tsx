@@ -8,12 +8,24 @@ import { fetchUserMemory, updateUserProfile } from "@/services/api";
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
    ────────────────────────────────────────────── */
-const ease = [0.23, 1, 0.32, 1];
+const ease = [0.23, 1, 0.32, 1] as const;
+
+interface UserMemoryProfile {
+    interests?: string[];
+    goals?: string[];
+    stage?: string;
+    learning_pace?: string;
+}
+
+interface UserMemory {
+    profile?: UserMemoryProfile;
+    onboarding?: { mentoring_style?: string };
+}
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [userMemory, setUserMemory] = useState<any>(null);
+    const [userMemory, setUserMemory] = useState<UserMemory | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -27,7 +39,7 @@ export default function ProfilePage() {
 
     const loadProfile = async () => {
         try {
-            const memory = await fetchUserMemory();
+            const memory = await fetchUserMemory() as UserMemory | null;
             setUserMemory(memory);
             setInterests(memory?.profile?.interests || []);
             setGoals(memory?.profile?.goals || []);
