@@ -20,15 +20,37 @@ export function useMentorSocket({
     const [isConnected, setIsConnected] = useState(false);
     const [isSupported, setIsSupported] = useState(true);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const backoffRef = useRef(3000); // Start at 3s, exponential up to 30s
+
+    // ── Ref-based callbacks ───────────────────────────────────────────
+    // Prevents the WebSocket from reconnecting every time the parent
+    // re-renders with new inline callback references.
+    const onTokenRef = useRef(onToken);
+    const onDoneRef = useRef(onDone);
+    const onErrorRef = useRef(onError);
+    const onTypingRef = useRef(onTyping);
+
+    useEffect(() => { onTokenRef.current = onToken; }, [onToken]);
+    useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+    useEffect(() => { onErrorRef.current = onError; }, [onError]);
+    useEffect(() => { onTypingRef.current = onTyping; }, [onTyping]);
 
     const connect = useCallback(() => {
         if (!sessionId) return;
+
+        // Clean up any existing connection before creating a new one
+        if (wsRef.current) {
+            wsRef.current.onclose = null; // Prevent reconnect from old close
+            wsRef.current.close();
+        }
 
         try {
             const ws = new WebSocket(`${WS_URL}/ws/chat/${sessionId}`);
 
             ws.onopen = () => {
                 setIsConnected(true);
+                setIsSupported(true);
+                backoffRef.current = 3000; // Reset backoff on successful connect
             };
 
             ws.onmessage = (event) => {
@@ -36,16 +58,16 @@ export function useMentorSocket({
                     const data = JSON.parse(event.data);
                     switch (data.type) {
                         case "token":
-                            onToken?.(data.content);
+                            onTokenRef.current?.(data.content);
                             break;
                         case "done":
-                            onDone?.(data.content, data.chat_id);
+                            onDoneRef.current?.(data.content, data.chat_id);
                             break;
                         case "error":
-                            onError?.(data.content);
+                            onErrorRef.current?.(data.content);
                             break;
                         case "typing":
-                            onTyping?.();
+                            onTypingRef.current?.();
                             break;
                     }
                 } catch {
@@ -55,10 +77,12 @@ export function useMentorSocket({
 
             ws.onclose = () => {
                 setIsConnected(false);
-                // Auto-reconnect after 3 seconds
+                // Auto-reconnect with exponential backoff
+                const delay = backoffRef.current;
+                backoffRef.current = Math.min(delay * 2, 30000);
                 reconnectTimer.current = setTimeout(() => {
                     connect();
-                }, 3000);
+                }, delay);
             };
 
             ws.onerror = () => {
@@ -70,13 +94,16 @@ export function useMentorSocket({
         } catch {
             setIsSupported(false);
         }
-    }, [sessionId, onToken, onDone, onError, onTyping]);
+    }, [sessionId]); // Only reconnect when sessionId changes
 
     useEffect(() => {
         connect();
         return () => {
             if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-            wsRef.current?.close();
+            if (wsRef.current) {
+                wsRef.current.onclose = null; // Prevent reconnect on intentional close
+                wsRef.current.close();
+            }
         };
     }, [connect]);
 
@@ -93,7 +120,10 @@ export function useMentorSocket({
 
     const disconnect = useCallback(() => {
         if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-        wsRef.current?.close();
+        if (wsRef.current) {
+            wsRef.current.onclose = null;
+            wsRef.current.close();
+        }
         setIsConnected(false);
     }, []);
 

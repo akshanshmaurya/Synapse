@@ -51,6 +51,27 @@ export default function DashboardPage() {
 
     useEffect(() => { loadAll(); }, []);
 
+    // ── Silent 30-second auto-refresh (no loading spinner) ────────
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            try {
+                const [dashResult, recsResult] = await Promise.allSettled([
+                    fetchDashboardData(),
+                    fetchDashboardRecommendations(),
+                ]);
+                if (dashResult.status === "fulfilled" && dashResult.value) {
+                    setDashboard(dashResult.value);
+                }
+                if (recsResult.status === "fulfilled" && recsResult.value) {
+                    setRecs(recsResult.value);
+                }
+            } catch {
+                // Silent refresh — don't show errors for background polling
+            }
+        }, 30_000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <AppShell activePath="/dashboard">
             <div className="max-w-6xl mx-auto px-6 md:px-10 lg:px-14 py-10 md:py-14 space-y-10">

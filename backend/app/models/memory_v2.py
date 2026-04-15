@@ -182,8 +182,10 @@ class ConceptRecord(BaseModel):
 
     @field_validator("mastery_level")
     @classmethod
-    def clamp_mastery(cls, v: float) -> float:
-        return max(0.0, min(1.0, v))
+    def validate_mastery(cls, v: float) -> float:
+        if v < 0.0 or v > 1.0:
+            raise ValueError(f"mastery_level must be between 0.0 and 1.0, got {v}")
+        return v
 
 
 class UserConceptMemory(BaseModel):
@@ -250,6 +252,14 @@ class SessionContext(BaseModel):
     # "problem_solving" — user has a specific task/problem to solve (e.g. debug this code)
     # "casual"          — general conversation, no learning intent detected
     # "review"          — user is explicitly revisiting something they've seen before
+
+    @field_validator("session_intent")
+    @classmethod
+    def validate_session_intent(cls, v: str) -> str:
+        allowed = {"unknown", "learning", "problem_solving", "casual", "review"}
+        if v not in allowed:
+            raise ValueError(f"session_intent must be one of {allowed}")
+        return v
 
     goal_inferred: bool = False
     # True when session_goal was set by the system (inference), not the user.

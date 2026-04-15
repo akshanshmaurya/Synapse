@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Leaf, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, Network } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
+import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
 import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 import { useSessionContext } from "@/hooks/useSessionContext";
+import { useMentorSocket } from "@/hooks/use-mentor-socket";
 import SessionGoalBanner from "@/components/chat/SessionGoalBanner";
 import MomentumIndicator from "@/components/chat/MomentumIndicator";
 import ActiveConceptsBar from "@/components/chat/ActiveConceptsBar";
@@ -40,6 +41,11 @@ export default function MentorPage() {
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
+    // ── WebSocket streaming state ─────────────────────────────────
+    const streamingContentRef = useRef("");
+    const streamingBubbleIdRef = useRef<string | null>(null);
+    const pendingUserMessageRef = useRef<string>("");
+
     // Session context (Phase 6.1)
     const {
         context: sessionContext,
@@ -52,6 +58,95 @@ export default function MentorPage() {
         saveGoal,
         clearGoal,
     } = useSessionContext(chatId);
+
+    // ── WebSocket handlers (stable via refs in hook) ──────────────
+    const handleWsTyping = useCallback(() => {
+        // Typing indicator is already shown via isReflecting
+    }, []);
+
+    const handleWsToken = useCallback((token: string) => {
+        // First token arrives — replace typing indicator with a streaming bubble
+        if (!streamingBubbleIdRef.current) {
+            const bubbleId = `ws-stream-${Date.now()}`;
+            streamingBubbleIdRef.current = bubbleId;
+            streamingContentRef.current = token;
+            setIsReflecting(false);
+            setReflections(prev => [...prev, {
+                id: bubbleId,
+                type: "guidance",
+                content: token,
+                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            }]);
+        } else {
+            // Append subsequent tokens
+            streamingContentRef.current += " " + token;
+            const currentContent = streamingContentRef.current;
+            const currentId = streamingBubbleIdRef.current;
+            setReflections(prev => prev.map(r =>
+                r.id === currentId ? { ...r, content: currentContent } : r
+            ));
+        }
+    }, []);
+
+    const handleWsDone = useCallback((content: string, wsChatId: string) => {
+        const currentId = streamingBubbleIdRef.current;
+        // Finalize the streaming bubble with authoritative full text
+        if (currentId) {
+            setReflections(prev => prev.map(r =>
+                r.id === currentId ? { ...r, content } : r
+            ));
+        } else {
+            // Edge case: done arrived without any tokens (very fast response)
+            setIsReflecting(false);
+            setReflections(prev => [...prev, {
+                id: `ws-done-${Date.now()}`,
+                type: "guidance",
+                content,
+                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            }]);
+        }
+
+        // Reset streaming state
+        streamingBubbleIdRef.current = null;
+        streamingContentRef.current = "";
+        setIsReflecting(false);
+
+        // Set chatId if this was a new conversation
+        if (wsChatId && !chatId) {
+            setChatId(wsChatId);
+        }
+
+        // TTS for the final response
+        streamAudio(content).then(audio => {
+            if (audio) audio.play().catch(() => {});
+        });
+
+        // Refresh session context in background
+        refreshSessionContext().catch(() => {});
+    }, [chatId, refreshSessionContext]);
+
+    const handleWsError = useCallback((message: string) => {
+        streamingBubbleIdRef.current = null;
+        streamingContentRef.current = "";
+        setIsReflecting(false);
+
+        const errorId = `ws-err-${Date.now()}`;
+        setReflections(prev => [...prev, {
+            id: errorId,
+            type: "error",
+            content: message || "Connection error. Retrying...",
+            timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+        }]);
+    }, []);
+
+    // ── Wire up WebSocket ──────────────────────────────────────────
+    const { isConnected: wsConnected, sendMessage: wsSendMessage } = useMentorSocket({
+        sessionId: chatId ?? "new",
+        onToken: handleWsToken,
+        onDone: handleWsDone,
+        onError: handleWsError,
+        onTyping: handleWsTyping,
+    });
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -117,19 +212,36 @@ export default function MentorPage() {
         }
     };
 
+    // ── Submit: WS primary, REST silent fallback ──────────────────
     const handleSubmit = async () => {
         if (!input.trim()) return;
+        const userText = input.trim();
         const thought: Reflection = {
             id: Date.now().toString(),
             type: "thought",
-            content: input,
+            content: userText,
             timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
         };
         setReflections(prev => [...prev, thought]);
         setInput("");
         setIsReflecting(true);
+
+        // Reset streaming state for this new message
+        streamingBubbleIdRef.current = null;
+        streamingContentRef.current = "";
+
+        // ── Try WebSocket first ───────────────────────────────────
+        const sentViaWs = wsSendMessage(userText);
+        if (sentViaWs) {
+            // WS handlers (onToken/onDone/onError) will manage the response.
+            // isReflecting stays true until first token or done arrives.
+            pendingUserMessageRef.current = userText;
+            return;
+        }
+
+        // ── REST fallback (WS not connected) ──────────────────────
         try {
-            const result = await sendMessage(thought.content, chatId || undefined);
+            const result = await restSendMessage(userText, chatId || undefined);
             if (result.chatId && !chatId) {
                 setChatId(result.chatId);
             }
@@ -143,22 +255,22 @@ export default function MentorPage() {
             setReflections(prev => [...prev, guidance]);
             const audio = await streamAudio(result.response);
             if (audio) {
-                audio.play().catch(e => console.warn("Auto-play prevented:", e));
+                audio.play().catch(() => {});
             }
-            // Refresh session context in background after AI response
             refreshSessionContext().catch(() => {});
         } catch (error) {
             console.error("Session error", error);
+            const errorId = (Date.now() + 1).toString();
             const errorGuidance: Reflection = {
-                id: (Date.now() + 1).toString(),
+                id: errorId,
                 type: "error",
                 content: "Failed to send message.",
                 timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
                 onRetry: () => {
-                    // Remove the error message
-                    setReflections(prev => prev.filter(r => r.id !== errorGuidance.id));
-                    // And resubmit
-                    handleSubmit();
+                    setReflections(prev => prev.filter(r => r.id !== errorId));
+                    setInput(userText);
+                    // Re-trigger on next tick so input state settles
+                    setTimeout(() => handleSubmit(), 0);
                 }
             };
             setReflections(prev => [...prev, errorGuidance]);
@@ -283,7 +395,16 @@ export default function MentorPage() {
                                 >
                                     Nurturing Session
                                 </h1>
-                                <span className="mono-tag text-[8px] text-[#8B8178]/50">// Active · AI Mentor</span>
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-700 ${
+                                        wsConnected
+                                            ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                                            : "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.4)] animate-pulse"
+                                    }`} />
+                                    <span className="mono-tag text-[8px] text-[#8B8178]/50">
+                                        {wsConnected ? "// Live · AI Mentor" : "// Reconnecting..."}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
