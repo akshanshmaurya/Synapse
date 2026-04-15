@@ -18,6 +18,7 @@ import {
     WhatToLearnNext,
     RecentSessionsTimeline,
 } from "@/components/dashboard";
+import LearningInsightsCard from "@/components/dashboard/LearningInsightsCard";
 
 const ease = [0.23, 1, 0.32, 1] as const;
 
@@ -142,6 +143,8 @@ export default function DashboardPage() {
                                 )}
                                 {dashboard.next_bloom && <NextFocusCard nextBloom={dashboard.next_bloom} delay={0.4} />}
                             </div>
+
+                            <LearningInsightsCard delay={0.35} />
 
                             {recs?.recent_sessions && <RecentSessionsTimeline sessions={recs.recent_sessions} delay={0.4} />}
                             <RecentSignals signals={dashboard.recent_signals} delay={0.45} />

@@ -376,8 +376,8 @@ Create `backend/.env`:
 
 ```env
 # Database
-MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB=synapse
+MONGO_URI=
+MONGODB_DB=
 
 # Authentication
 JWT_SECRET=<run: python -c "import secrets; print(secrets.token_urlsafe(64))">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, Network } from "lucide-react";
+import { Leaf, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, Network, Brain } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
@@ -11,6 +11,7 @@ import SessionGoalBanner from "@/components/chat/SessionGoalBanner";
 import MomentumIndicator from "@/components/chat/MomentumIndicator";
 import ActiveConceptsBar from "@/components/chat/ActiveConceptsBar";
 import MessageBubble, { type Reflection } from "@/components/chat/MessageBubble";
+import AIInsightsPanel from "@/components/chat/AIInsightsPanel";
 
 /* ──────────────────────────────────────────────
    Animation Presets (Landing Page system)
@@ -34,6 +35,26 @@ export default function MentorPage() {
     const [isReflecting, setIsReflecting] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+
+    // AI Insights panel state (persisted in localStorage)
+    const [insightsOpen, setInsightsOpen] = useState(() => {
+        try {
+            const saved = localStorage.getItem("synapse_insights_panel");
+            // Default: open on desktop, closed on mobile
+            if (saved !== null) return saved === "open";
+            return window.innerWidth >= 768;
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleInsights = useCallback(() => {
+        setInsightsOpen(prev => {
+            const next = !prev;
+            try { localStorage.setItem("synapse_insights_panel", next ? "open" : "closed"); } catch {}
+            return next;
+        });
+    }, []);
 
     // Chat history state
     const [chatId, setChatId] = useState<string | null>(null);
@@ -428,6 +449,17 @@ export default function MentorPage() {
                                 <History className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">History</span>
                             </button>
+                            <button
+                                onClick={toggleInsights}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-500 text-sm font-medium border ${
+                                    insightsOpen
+                                        ? "bg-[#5C6B4A] text-white border-[#5C6B4A] shadow-[0_8px_20px_rgba(92,107,74,0.2)]"
+                                        : "text-[#8B8178] bg-white/50 border-[#E8DED4] hover:border-[#5C6B4A]/30 hover:text-[#5C6B4A]"
+                                }`}
+                            >
+                                <Brain className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Insights</span>
+                            </button>
                         </div>
                     </motion.header>
 
@@ -626,6 +658,15 @@ export default function MentorPage() {
                         </div>
                     </div>
                 </main>
+
+                {/* ═══ AI INSIGHTS PANEL ═══ */}
+                <AIInsightsPanel
+                    isOpen={insightsOpen}
+                    onClose={toggleInsights}
+                    sessionContext={sessionContext}
+                    sessionContextLoading={sessionContextLoading}
+                    reflections={reflections}
+                />
             </div>
 
             {/* Cognitive Trace Panel */}
