@@ -5,24 +5,59 @@ import {
   type SessionContext,
 } from "@/services/api";
 
+/**
+ * Return shape of the {@link useSessionContext} hook.
+ *
+ * Provides both the raw session context from the backend and convenience
+ * derived booleans for common UI branching (learning vs casual, goal state).
+ */
 interface UseSessionContextReturn {
   /** Full session context from the backend, null if not yet loaded or chat is new. */
   context: SessionContext | null;
+  /** True while the context is being fetched from the server. */
   isLoading: boolean;
+  /** Human-readable error message if the context fetch failed, null otherwise. */
   error: string | null;
 
   // Derived state (computed from context)
+  /** True when session_intent is "learning" or "problem_solving". */
   isLearningSession: boolean;
+  /** True when session_intent is "casual". */
   isCasualSession: boolean;
+  /** True when the user has explicitly confirmed a session goal. */
   hasConfirmedGoal: boolean;
+  /** True when the AI inferred a goal but the user has not yet confirmed it. */
   hasInferredGoal: boolean;
 
   // Actions
+  /** Re-fetch the session context from the backend. */
   refreshContext: () => Promise<void>;
+  /**
+   * Persist a session goal to the backend with optimistic local update.
+   * @param goal - The goal text to save.
+   * @param domain - Optional learning domain (e.g. "dsa", "python").
+   */
   saveGoal: (goal: string, domain?: string) => Promise<void>;
+  /** Clear the local goal state (does not persist; used for inline editing). */
   clearGoal: () => void;
 }
 
+/**
+ * Manages session context state for a given chat session.
+ *
+ * Automatically fetches context when the chatId changes and provides
+ * methods to save/clear goals with optimistic updates. All fetch errors
+ * are caught internally — the chat remains functional even if context
+ * loading fails.
+ *
+ * @param chatId - The active chat session ID, or null if no chat is selected.
+ * @returns Session context state, derived booleans, and action methods.
+ *
+ * @example
+ * ```tsx
+ * const { context, isLearningSession, saveGoal } = useSessionContext(chatId);
+ * ```
+ */
 export function useSessionContext(chatId: string | null): UseSessionContextReturn {
   const [context, setContext] = useState<SessionContext | null>(null);
   const [isLoading, setIsLoading] = useState(false);

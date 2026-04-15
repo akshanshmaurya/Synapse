@@ -80,6 +80,13 @@ interface ChatResult {
     };
 }
 
+/**
+ * Send a message to the AI mentor and receive a response.
+ *
+ * @param message - The user's message text.
+ * @param chatId - Optional existing chat session ID. If omitted, the server creates a new session.
+ * @returns Chat result containing the mentor's response and the chat session ID.
+ */
 export async function sendMessage(message: string, chatId?: string): Promise<ChatResult> {
     const body: Record<string, string> = { message };
     if (chatId) body.chat_id = chatId;
@@ -102,7 +109,12 @@ export async function sendMessage(message: string, chatId?: string): Promise<Cha
     };
 }
 
-// Legacy function for backward compatibility
+/**
+ * @deprecated Use {@link sendMessage} instead. Preserved for backward compatibility.
+ * @param userId - The user's ID (ignored — auth is cookie-based).
+ * @param message - The message text to send.
+ * @returns The mentor's response text.
+ */
 export async function sendMessageWithUserId(userId: string, message: string): Promise<string> {
     const result = await sendMessage(message);
     return result.response;
@@ -111,6 +123,12 @@ export async function sendMessageWithUserId(userId: string, message: string): Pr
 
 // ─── Session Context API (Phase 6.1) ─────────────────────────────────
 
+/**
+ * Fetch the session context (Layer 3 working memory) for a chat session.
+ *
+ * @param chatId - The chat session ID.
+ * @returns The SessionContext object, or null if the session has no context yet.
+ */
 export async function fetchChatContext(chatId: string): Promise<SessionContext | null> {
     try {
         const response = await fetch(`${API_URL}/api/chats/${chatId}/context`, {
@@ -131,6 +149,12 @@ export async function fetchChatContext(chatId: string): Promise<SessionContext |
     }
 }
 
+/**
+ * Set or update the session goal for a chat.
+ *
+ * @param chatId - The chat session ID.
+ * @param payload - Goal text, confirmation flag, and optional domain.
+ */
 export async function setSessionGoal(chatId: string, payload: SetGoalPayload): Promise<void> {
     const response = await fetch(`${API_URL}/api/chats/${chatId}/context/goal`, {
         method: 'PATCH',
@@ -168,6 +192,13 @@ export interface ChatMessage {
     timestamp: string;
 }
 
+/**
+ * Fetch paginated chat session history for the authenticated user.
+ *
+ * @param limit - Maximum number of sessions to return (default: 20).
+ * @param offset - Number of sessions to skip for pagination (default: 0).
+ * @returns Array of chat sessions, empty array on failure.
+ */
 export async function fetchChatSessions(limit: number = 20, offset: number = 0): Promise<ChatSession[]> {
     const response = await fetch(
         `${API_URL}/api/chats?limit=${limit}&offset=${offset}`,
@@ -183,6 +214,13 @@ export async function fetchChatSessions(limit: number = 20, offset: number = 0):
     return data.chats || [];
 }
 
+/**
+ * Fetch messages for a specific chat session.
+ *
+ * @param chatId - The chat session ID.
+ * @param limit - Maximum messages to return (default: 50).
+ * @returns Array of chat messages, empty array on failure.
+ */
 export async function fetchChatMessages(chatId: string, limit: number = 50): Promise<ChatMessage[]> {
     const response = await fetch(
         `${API_URL}/api/chats/${chatId}/messages?limit=${limit}`,
@@ -198,6 +236,12 @@ export async function fetchChatMessages(chatId: string, limit: number = 50): Pro
     return data.messages || [];
 }
 
+/**
+ * Create a new chat session on the server.
+ *
+ * @param title - Optional display title for the session.
+ * @returns The new chat session ID, or null on failure.
+ */
 export async function createChatSession(title?: string): Promise<string | null> {
     try {
         const response = await fetch(`${API_URL}/api/chats`, {
@@ -217,6 +261,12 @@ export async function createChatSession(title?: string): Promise<string | null> 
     }
 }
 
+/**
+ * Delete a chat session and all its messages.
+ *
+ * @param chatId - The chat session ID to delete.
+ * @returns True if deletion succeeded, false otherwise.
+ */
 export async function deleteChatSession(chatId: string): Promise<boolean> {
     try {
         const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
@@ -229,7 +279,12 @@ export async function deleteChatSession(chatId: string): Promise<boolean> {
     }
 }
 
-// TTS API
+/**
+ * Stream text-to-speech audio for a given text string.
+ *
+ * @param text - The text to convert to speech.
+ * @returns An HTMLAudioElement ready to play, or null on failure.
+ */
 export async function streamAudio(text: string): Promise<HTMLAudioElement | null> {
     try {
         const response = await fetch(`${API_URL}/api/tts`, {
@@ -249,7 +304,11 @@ export async function streamAudio(text: string): Promise<HTMLAudioElement | null
     }
 }
 
-// User API
+/**
+ * Fetch the authenticated user's account state (email, onboarding status, etc.).
+ *
+ * @returns User state object, or null if not authenticated.
+ */
 export async function fetchUserState(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/me`, {
@@ -262,6 +321,11 @@ export async function fetchUserState(): Promise<Record<string, unknown> | null> 
     }
 }
 
+/**
+ * Fetch the user's legacy memory document (pre–Phase 4.7).
+ *
+ * @returns Raw user memory document, or null on failure.
+ */
 export async function fetchUserMemory(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/memory`, {
@@ -311,7 +375,11 @@ export interface DashboardData {
     show_daily_nurture: boolean;
     daily_nurture_prompt: string | null;
 }
-
+/**
+ * Fetch aggregated dashboard data (momentum, effort, signals, next bloom).
+ *
+ * @returns Dashboard data object, or null on failure.
+ */
 export async function fetchDashboardData(): Promise<DashboardData | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/dashboard`, {
@@ -324,6 +392,13 @@ export async function fetchDashboardData(): Promise<DashboardData | null> {
     }
 }
 
+/**
+ * Update the user's profile interests and goals.
+ *
+ * @param interests - Optional array of interest tags.
+ * @param goals - Optional array of goal strings.
+ * @returns True if the update succeeded.
+ */
 export async function updateUserProfile(interests?: string[], goals?: string[]): Promise<boolean> {
     try {
         const params = new URLSearchParams();
@@ -341,6 +416,11 @@ export async function updateUserProfile(interests?: string[], goals?: string[]):
 }
 
 // Roadmap API
+/**
+ * Fetch the user's current active roadmap.
+ *
+ * @returns Roadmap data object, or null if no active roadmap exists.
+ */
 export async function fetchRoadmap(): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/current`, {
@@ -353,6 +433,13 @@ export async function fetchRoadmap(): Promise<Record<string, unknown> | null> {
     }
 }
 
+/**
+ * Generate a new AI-powered learning roadmap.
+ *
+ * @param goal - The learning goal to generate a roadmap for.
+ * @param context - Optional additional context to guide generation.
+ * @returns Generated roadmap object, or null on failure.
+ */
 export async function generateRoadmap(goal: string, context?: string): Promise<Record<string, unknown> | null> {
     try {
         const body: Record<string, string> = { goal };
@@ -372,6 +459,15 @@ export async function generateRoadmap(goal: string, context?: string): Promise<R
     }
 }
 
+/**
+ * Submit feedback on a specific roadmap step.
+ *
+ * @param roadmapId - The roadmap's ID.
+ * @param stepId - The step within the roadmap.
+ * @param feedbackType - Type of feedback (e.g. "stuck", "not_clear", "completed").
+ * @param message - Optional free-text feedback message.
+ * @returns True if submission succeeded.
+ */
 export async function submitRoadmapFeedback(
     roadmapId: string,
     stepId: string,
@@ -397,6 +493,12 @@ export async function submitRoadmapFeedback(
     }
 }
 
+/**
+ * Request roadmap regeneration based on accumulated feedback.
+ *
+ * @param roadmapId - The roadmap ID to regenerate.
+ * @returns New roadmap data, or null on failure.
+ */
 export async function regenerateRoadmap(roadmapId: string): Promise<Record<string, unknown> | null> {
     try {
         const response = await fetch(`${API_URL}/api/roadmap/regenerate/${roadmapId}`, {
@@ -428,6 +530,11 @@ export interface AnalyticsData {
     };
 }
 
+/**
+ * Fetch detailed learning analytics (clarity trends, session activity, struggles).
+ *
+ * @returns Analytics data object, or null on failure.
+ */
 export async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
     try {
         const response = await fetch(`${API_URL}/api/analytics/learning`, {
@@ -443,6 +550,11 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
 
 // ─── Concept Map API (Phase 6.2) ─────────────────────────────────────
 
+/**
+ * Fetch the user's concept map — nodes with mastery data and prerequisite edges.
+ *
+ * @returns Concept map data (nodes + edges), or null on failure.
+ */
 export async function fetchConceptMap(): Promise<ConceptMapData | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/concept-map`, {
@@ -455,6 +567,11 @@ export async function fetchConceptMap(): Promise<ConceptMapData | null> {
     }
 }
 
+/**
+ * Fetch ZPD-based concept recommendations (next concepts to learn).
+ *
+ * @returns Array of ZPD recommendations, empty array on failure.
+ */
 export async function fetchRecommendations(): Promise<ZPDRecommendation[]> {
     try {
         const response = await fetch(`${API_URL}/api/user/recommendations`, {
@@ -493,6 +610,11 @@ export interface DashboardRecommendationsData {
     recent_sessions: RecentSession[];
 }
 
+/**
+ * Fetch combined dashboard recommendations including velocity, next steps, and recent sessions.
+ *
+ * @returns Dashboard recommendations data, or null on failure.
+ */
 export async function fetchDashboardRecommendations(): Promise<DashboardRecommendationsData | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/recommendations`, {
@@ -542,6 +664,14 @@ export interface LearningReport {
   };
 }
 
+/**
+ * Fetch the user's comprehensive learning outcome report.
+ *
+ * Aggregates profile, concept mastery, session stats, and roadmap progress
+ * into a single structured report suitable for display or PDF export.
+ *
+ * @returns Learning report data, or null on failure.
+ */
 export async function fetchLearningReport(): Promise<LearningReport | null> {
     try {
         const response = await fetch(`${API_URL}/api/user/report`, {

@@ -1,60 +1,227 @@
 # Contributing to Synapse
 
-First off, thank you for considering contributing to Synapse! It's people like you that make Synapse such a great tool for AI-assisted mentorship and education.
+Thank you for your interest in contributing to Synapse! This guide covers the conventions and processes you need to follow.
 
-## Introduction
+---
 
-Synapse is an AI mentor system that evaluates understanding, not just conversation. Built using a multi-agent architecture (Memory → Planner → Executor → Evaluator) for adaptive learning guidance. We welcome contributions for bug fixes, new features, documentation updates, and improvements to the multi-agent system.
+## Table of Contents
 
-## Development Setup
+- [Getting Started](#getting-started)
+- [Branch Naming](#branch-naming)
+- [Commit Message Format](#commit-message-format)
+- [Code Standards](#code-standards)
+- [Testing](#testing)
+- [Pull Request Process](#pull-request-process)
+- [Architecture Overview](#architecture-overview)
 
-The project uses a React + TypeScript frontend, a FastAPI backend, and MongoDB.
+---
 
-1. **Fork the repository** on GitHub.
-2. **Clone your fork** locally.
-3. **Backend Setup**:
-   - Navigate to the `backend/` directory.
-   - Set up your `.env` file with MongoDB credentials, Gemini API key, and ElevenLabs API key.
-   - Install requirements: `pip install -r requirements.txt`
-   - Run the server: `python -m uvicorn app.main:app --reload --port 8000`
-4. **Frontend Setup**:
-   - Navigate to the root directory.
-   - Install dependencies: `npm install`
-   - Start the development server: `npm run dev`
+## Getting Started
 
-## Branch Strategy
+```bash
+# Clone and install
+git clone https://github.com/akshansh-maurya/Synapse.git
+cd Synapse && npm install
+cd backend && pip install -r requirements.txt -r requirements-dev.txt
+```
 
-We use a simple branching strategy. Create a branch from `main` for your work. Use the following prefixes for your branch names:
-- `feature/` for new features (e.g., `feature/new-agent`)
-- `fix/` for bug fixes (e.g., `fix/auth-bug`)
-- `docs/` for documentation updates (e.g., `docs/update-readme`)
-- `refactor/` for code refactoring
+Create your environment files:
+- `backend/.env` — see [README.md](README.md#2-backend-setup) for required variables
+- `.env` (project root) — set `VITE_API_URL=http://localhost:8000`
 
-## Contribution Steps
+Verify the setup:
+```bash
+# Backend
+cd backend && uvicorn app.main:app --reload --port 8000
 
-1. **Fork repository** and clone it locally.
-2. **Create branch** from `main` using our branch strategy.
-3. **Make changes** and ensure your code is well-tested.
-4. **Submit pull request** against the `main` branch.
+# Frontend (from project root)
+npm run dev
+```
+
+---
+
+## Branch Naming
+
+Use the following prefixes:
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feat/` | New feature | `feat/interview-prep-mode` |
+| `fix/` | Bug fix | `fix/clarity-score-overflow` |
+| `docs/` | Documentation only | `docs/add-architecture-guide` |
+| `refactor/` | Code refactor (no behavior change) | `refactor/extract-mastery-formula` |
+| `test/` | Adding or updating tests | `test/concept-memory-edge-cases` |
+| `chore/` | Tooling, CI, dependencies | `chore/upgrade-fastapi` |
+
+Always branch from `main`. Keep branches short-lived.
+
+---
+
+## Commit Message Format
+
+```
+<type>(<scope>): <short description>
+
+<optional body>
+```
+
+**Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
+
+**Scopes:** `agents`, `services`, `frontend`, `api`, `auth`, `db`, `ci`, `docs`
+
+**Examples:**
+```
+feat(agents): add interview scoring to evaluator agent
+fix(services): prevent clarity score from exceeding 100
+docs(services): add docstrings to all public methods
+test(agents): add edge cases for confusion fail-safe
+refactor(frontend): extract concept map tooltip component
+```
+
+Keep the subject line under 72 characters. Use the body for "why", not "what".
+
+---
 
 ## Code Standards
 
-To maintain a high quality and consistent codebase, please adhere to the following standards:
+### Python (Backend)
 
-### Python Formatting
-- We use `ruff` for linting and formatting. Run `ruff check app/ tests/` and `ruff format app/ tests/` before submitting.
-- Follow PEP 8 guidelines.
-- Ensure type hints are used where appropriate.
+- **Formatter:** [Ruff](https://docs.astral.sh/ruff/) (configured in `pyproject.toml`)
+- **Type hints:** Required on all public function signatures
+- **Docstrings:** Required on every public module, class, and function
 
-### TypeScript Formatting
-- Use ESLint and Prettier.
-- Run `npm run lint` before committing your changes.
-- Use strict TypeScript types; avoid `any` wherever possible.
+**Docstring format (Google style):**
+```python
+"""One-sentence summary of what this function does.
 
-### Commit Message Style
-Please follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification for your commit messages.
+Extended description if needed — explain the "why", not just the "what".
 
-Examples:
-- `feat(agents): add new evaluation agent`
-- `fix(auth): resolve JWT expiration bug`
-- `docs: update setup instructions in README`
+Args:
+    user_id: The learner's unique identifier.
+    session_id: The active session to analyze.
+
+Returns:
+    Dict with keys:
+        - status: "success" or "error"
+        - data: The computed result
+"""
+```
+
+- No bare `except:` — always catch specific exceptions
+- Use `logging` instead of `print()`
+- Async functions should use `await` (not blocking I/O in async code)
+
+### TypeScript (Frontend)
+
+- **Linter:** ESLint (configured in `eslint.config.js`)
+- **No `any` types** in production code — use explicit interfaces
+- **JSDoc:** Required on all exported functions and hooks
+
+**JSDoc format:**
+```typescript
+/**
+ * One-sentence summary.
+ *
+ * @param chatId - The active chat session ID.
+ * @returns The session context object or null.
+ */
+```
+
+- Use named exports (not default exports)
+- Prefer `interface` over `type` for object shapes
+- Colocate types with their API function or hook
+
+### General
+
+- No hardcoded secrets, API keys, or URLs — use environment variables
+- No `console.log` in production code — use proper logging
+- Keep functions under 50 lines when possible
+- Prefer early returns over deep nesting
+
+---
+
+## Testing
+
+### Backend
+
+```bash
+cd backend
+
+# Run all tests
+pytest -q
+
+# Run with coverage report
+pytest --cov=app --cov-report=term-missing
+
+# Run a specific test file
+pytest tests/test_concept_memory_service.py -v
+
+# Run tests matching a pattern
+pytest -k "test_confusion" -v
+```
+
+**Test file naming:** `tests/test_<module_name>.py`
+
+**Test function naming:** `test_<method>_<scenario>_<expected_result>`
+
+```python
+# Good
+def test_classify_intent_casual_message_returns_casual():
+    ...
+
+# Bad
+def test_intent():
+    ...
+```
+
+**Coverage requirements:**
+- New services/agents: aim for ≥ 80% line coverage
+- Bug fixes: must include a regression test
+
+### Frontend
+
+```bash
+# From project root
+npm run test
+```
+
+---
+
+## Pull Request Process
+
+1. **Create a branch** from `main` using the [naming convention](#branch-naming)
+2. **Make your changes** — follow the [code standards](#code-standards)
+3. **Write/update tests** — CI will fail without passing tests
+4. **Run linters locally:**
+   ```bash
+   # Backend
+   cd backend && ruff check . && ruff format --check .
+
+   # Frontend
+   npx eslint .
+   ```
+5. **Open a PR** against `main` with:
+   - A clear title following the commit format
+   - Description of what changed and why
+   - Screenshots for UI changes
+6. **CI must pass** — ruff lint → pytest + coverage
+7. **Address review feedback** promptly
+
+---
+
+## Architecture Overview
+
+Synapse uses a four-agent pipeline (Memory → Planner → Executor → Evaluator) with three-layer memory (Identity, Concepts, Session). For a detailed breakdown, see [`docs/architecture.md`](docs/architecture.md).
+
+**Key files for new contributors:**
+- `backend/app/services/agent_orchestrator.py` — the pipeline coordinator
+- `backend/app/agents/` — the four agent implementations
+- `backend/app/services/` — memory layer services
+- `src/services/api.ts` — frontend API client
+- `src/hooks/` — React state management hooks
+
+---
+
+## Questions?
+
+Open an issue or start a discussion. We're happy to help you find the right place to contribute.

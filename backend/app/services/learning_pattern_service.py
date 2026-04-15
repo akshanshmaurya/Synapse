@@ -23,10 +23,35 @@ from app.knowledge.prerequisite_graph import PREREQUISITE_GRAPH, get_all_prerequ
 logger = logging.getLogger(__name__)
 
 class LearningPatternService:
+    """Analyzes cross-session learning history to synthesize higher-level insights.
+
+    Detects structural patterns — learning velocity, struggle categories, and
+    domain imbalances — that per-concept mastery scores alone cannot reveal.
+    Rooted in Vygotsky's ZPD theory, this service identifies whether a learner
+    is struggling due to missing prerequisites or simply needs more practice.
+
+    All analysis is deterministic (no LLM calls). Methods are async because they
+    read from MongoDB via ConceptMemoryService and SessionContextService.
+    """
+
     async def analyze_learning_velocity(self, user_id: str) -> Dict[str, Any]:
-        """
-        Calculates how FAST the user is learning across concepts.
-        Analyzes mastery_history for concepts with 3+ history entries to compute velocity.
+        """Calculate how fast the user is learning across all tracked concepts.
+
+        Computes per-concept velocity from mastery_history entries and aggregates
+        into domain-level and overall velocity classifications.
+
+        Args:
+            user_id: The learner whose velocity to analyze.
+
+        Returns:
+            Dict with keys:
+                - status: "success" or "insufficient_data"
+                - overall_velocity: "fast", "steady", "slow", or "regressing"
+                - fast_concepts: list of concept_ids with velocity > 0.1
+                - steady_concepts: list of concept_ids with velocity 0.03–0.1
+                - slow_concepts: list of concept_ids with velocity 0–0.03
+                - regressing_concepts: list of concept_ids with negative velocity
+                - velocity_by_domain: dict of {domain: avg_velocity}
         """
         start_time = time.time()
         
@@ -105,9 +130,22 @@ class LearningPatternService:
         }
 
     async def detect_struggle_patterns(self, user_id: str) -> Dict[str, Any]:
-        """
-        Finds patterns in what the user struggles with.
-        Uses deterministic rules based on the prerequisite graph and mastery thresholds.
+        """Detect structural struggle patterns using the prerequisite graph.
+
+        Identifies four pattern types:
+            1. conceptual_gap — low mastery on prerequisite chains
+            2. breadth_without_depth — many mid-mastery concepts, none high
+            3. stuck_on_concept — prerequisites met but concept still low
+            4. domain_imbalance — large mastery gap between domains
+
+        Args:
+            user_id: The learner whose patterns to analyze.
+
+        Returns:
+            Dict with keys:
+                - patterns: list of pattern dicts (type, description, recommendation)
+                - primary_struggle_type: highest-priority pattern type or None
+                - learning_style_signal: suggested pedagogical adjustment or None
         """
         start_time = time.time()
         
@@ -222,9 +260,22 @@ class LearningPatternService:
         }
 
     async def generate_learning_profile_update(self, user_id: str) -> Dict[str, Any]:
-        """
-        Synthesizes velocity + patterns into profile updates (strengths, weaknesses, styles).
-        Returns the update dictionary but does not write to DB.
+        """Synthesize velocity and struggle data into profile update recommendations.
+
+        Combines results from analyze_learning_velocity() and detect_struggle_patterns()
+        to produce suggested strength/weakness additions for the user's profile.
+        Does NOT write to the database — the caller decides whether to apply.
+
+        Args:
+            user_id: The learner whose profile update to generate.
+
+        Returns:
+            Dict with keys:
+                - suggested_strength_additions: list of domain strings
+                - suggested_weakness_additions: list of tagged weakness strings
+                - learning_style_suggestion: pedagogical style hint or None
+                - confidence: 0.0–1.0 confidence in the recommendation
+                - reasoning: human-readable explanation string
         """
         velocity_data = await self.analyze_learning_velocity(user_id)
         pattern_data = await self.detect_struggle_patterns(user_id)
@@ -284,9 +335,25 @@ class LearningPatternService:
         }
 
     async def get_session_end_summary(self, user_id: str, session_id: str) -> Dict[str, Any]:
-        """
-        Generates a summary of what happened in this session from a learning perspective.
-        Cross-references SessionContext with ConceptMemory changes.
+        """Generate a post-session learning summary by cross-referencing memory layers.
+
+        Compares mastery snapshots before and after this session to determine which
+        concepts improved, which were struggled with, and whether the session was
+        aligned with the learner's Zone of Proximal Development.
+
+        Args:
+            user_id: The learner.
+            session_id: The session to summarize.
+
+        Returns:
+            Dict with keys:
+                - session_goal: the session's stated or inferred goal
+                - concepts_encountered: list of active concept_ids
+                - concepts_improved: list of {id, before, after} dicts
+                - concepts_struggled: list of {id, misconceptions} dicts
+                - session_effectiveness: "high", "moderate", or "low"
+                - zpd_alignment: bool — whether the session targeted ZPD concepts
+                - next_session_suggestion: actionable recommendation string
         """
         start_time = time.time()
         

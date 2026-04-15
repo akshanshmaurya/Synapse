@@ -343,8 +343,17 @@ class SessionContextService:
         }
 
     async def update_session(self, session_id: str, updates: dict) -> None:
-        """
-        Generic update method for a SessionContext.
+        """Apply an arbitrary set of field updates to a SessionContext document.
+
+        This is a generic escape hatch for cases where a dedicated method
+        (update_clarity, update_session_goal, etc.) does not exist. Prefer the
+        specific methods when possible; this should only be called for bulk or
+        ad-hoc updates from the orchestrator.
+
+        Args:
+            session_id: The session to update.
+            updates: Dict of {field_name: new_value} to $set on the document.
+                     An updated_at timestamp is added automatically if absent.
         """
         collection = get_session_contexts_collection()
         
