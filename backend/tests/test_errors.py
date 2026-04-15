@@ -42,7 +42,7 @@ class TestAuthErrors:
 
     async def test_refresh_without_cookie(self, client):
         """Refresh without cookie → 401."""
-        resp = await client.post("/api/auth/refresh")
+        resp = await client.post("/api/auth/refresh", headers={"Content-Type": "application/json"})
         assert resp.status_code == 401
 
     async def test_protected_endpoint_without_auth(self, client):

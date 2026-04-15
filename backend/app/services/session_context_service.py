@@ -41,15 +41,14 @@ class SessionContextService:
     # --- Primary entry point ---------------------------------------------------
 
     async def get_or_create(self, session_id: str, user_id: str) -> SessionContext:
-        """
-        Load an existing SessionContext or create a fresh one.
+        """Load an existing SessionContext or create a fresh one.
 
-        Called on EVERY incoming message by the Agent Orchestrator. The returned
-        object gives agents a snapshot of the session's working memory so they
-        can tailor their behaviour to the current conversation state.
+        Args:
+            session_id: Unique identifier for the chat session.
+            user_id: Unique identifier for the learner.
 
         Returns:
-            SessionContext — either the persisted document or a new default one.
+            The loaded or newly initialized SessionContext object.
         """
         collection = get_session_contexts_collection()
 
@@ -98,16 +97,16 @@ class SessionContextService:
         goal: str,
         domain: Optional[str] = None,
     ) -> None:
-        """
-        Set (or overwrite) the session's inferred goal and optionally its domain.
+        """Set or overwrite the session's inferred goal and domain.
 
-        Called when:
-        - The planner infers the user's intent from the first few messages.
-        - The user explicitly states what they want to learn.
+        Args:
+            session_id: The session being updated.
+            user_id: The learner ID.
+            goal: The inferred or confirmed learning objective.
+            domain: Optional technical domain (e.g. 'React', 'DSA').
 
-        If *domain* is None the existing domain is left untouched so that a
-        goal refinement ("actually I want to focus on trees, not graphs") does
-        not accidentally blank the domain.
+        Returns:
+            None. Updates database record for working memory.
         """
         collection = get_session_contexts_collection()
 
@@ -139,23 +138,15 @@ class SessionContextService:
         clarity_score: float,
         confusion_points: Optional[List[str]] = None,
     ) -> None:
-        """
-        Atomically update session-scoped clarity and derive momentum.
+        """Atomically update session-scoped clarity and derive momentum.
 
-        Clarity is a 0–100 score produced by the evaluator FOR THIS SESSION
-        ONLY. It is fundamentally different from the global clarity stored in
-        the user profile — it cannot leak across topics.
+        Args:
+            session_id: The session being evaluated.
+            clarity_score: 0-100 score indicating current understanding.
+            confusion_points: Optional list of identified conceptual blockers.
 
-        Momentum derivation (deterministic, no LLM):
-            - < 3 messages          → "warming_up"  (not enough signal yet)
-            - clarity improved      → "flowing"      (cognitive flow state)
-            - clarity dropped       → "stuck"        (learner is struggling)
-            - otherwise             → "warming_up"   (neutral default)
-
-        Uses a single read to fetch previous clarity + message_count, then a
-        single atomic write. This is the one method that requires a brief read
-        before write — unavoidable because momentum depends on the *delta*
-        between old and new clarity.
+        Returns:
+            None. Calculates new momentum state based on clarity trajectory.
         """
         collection = get_session_contexts_collection()
 

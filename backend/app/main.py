@@ -22,12 +22,14 @@ import uuid
 
 from app.core.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
+from app.core.csrf import CSRFProtectionMiddleware
 from app.core.rate_limiter import rate_limit
 from app.db.mongodb import MongoDB, get_user_memory_collection
 from app.services.agent_orchestrator import AgentOrchestrator
 from app.auth.dependencies import get_current_user, get_current_user_optional
 from app.services.report_service import report_service
 from app.utils.logger import logger
+from app.utils.sanitizer import sanitize_text
 
 
 # --- Lifespan ---
@@ -83,6 +85,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # Security headers (runs third)
 app.add_middleware(SecurityHeadersMiddleware)
+
+# CSRF protection (runs after CORS, before Security headers)
+app.add_middleware(CSRFProtectionMiddleware)
 
 
 # CORS (runs second)
@@ -218,9 +223,10 @@ async def chat_endpoint(
         )
 
     try:
+        sanitized_message = sanitize_text(body.message)
         result = await orchestrator.process_message_async(
             user_id,
-            body.message,
+            sanitized_message,
             chat_id=body.chat_id,
             session_goal=body.session_goal,
         )
@@ -258,7 +264,8 @@ async def chat_guest_endpoint(
     """Guest chat — rate limited to 10/min, no auth required."""
     try:
         user_id = guest_id or f"guest_{uuid.uuid4().hex}"
-        response_text = await orchestrator.process_message_async(user_id, body.message)
+        sanitized_message = sanitize_text(body.message)
+        response_text = await orchestrator.process_message_async(user_id, sanitized_message)
         return ChatResponse(response=response_text)
     except Exception as e:
         logger.error("Guest chat error: %s", e)
@@ -319,15 +326,16 @@ async def update_session_goal(
         
     # Update Goal in session_contexts
     try:
+        sanitized_goal = sanitize_text(request_body.goal) if request_body.goal else request_body.goal
         await session_context_service.update_session(
             session_id=chat_id,
             updates={
-                "session_goal": request_body.goal,
+                "session_goal": sanitized_goal,
                 "goal_inferred": not request_body.confirmed, 
                 "goal_confirmed": request_body.confirmed
             }
         )
-        return {"success": True, "goal": request_body.goal, "confirmed": request_body.confirmed}
+        return {"success": True, "goal": sanitized_goal, "confirmed": request_body.confirmed}
     except Exception as e:
         logger.error(f"Failed to update session goal: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

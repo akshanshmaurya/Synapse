@@ -1,13 +1,8 @@
-"""
-Executor Agent
-Generates mentor responses and roadmaps using planner strategy and memory context.
-This is the main user-facing output generator.
+"""Generates pedagogical mentor responses and structured learning roadmaps.
 
-CONSTRAINTS:
-- Text responses: 6-8 lines max
-- Voice output: 5-6 lines max
-- Must obey planner controls (verbosity, tone)
-- No filler language, be concise
+By translating abstract planning strategies and memory context into concrete,
+natural language or structured data, this agent ensures the user receives
+personalized, actionable, and encouraging guidance.
 """
 from google import genai
 import json
@@ -21,15 +16,16 @@ class ExecutorAgent:
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
-    def generate_response(
-        self, 
-        user_context: Dict[str, Any],
-        current_message: str, 
-        strategy: Dict[str, Any]
-    ) -> str:
-        """
-        Generate a mentor response based on context and planner strategy.
-        CONSTRAINED to 6-8 lines max for faster, focused responses.
+    def generate_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
+        """Generate a natural language mentor response based on context and strategy.
+
+        Args:
+            user_context: Aggregated identity and knowledge context.
+            current_message: The latest user input string.
+            strategy: Pedagogical controls (tone, verbosity, strategy type).
+
+        Returns:
+            A string containing the mentor's response, constrained by strategy.
         """
         # Get planner controls
         verbosity = strategy.get("verbosity", "normal")
@@ -92,15 +88,16 @@ Respond now (max {max_lines} lines):"""
             logger.error("Executor response error: %s", e)
             return "I'm with you. Tell me more about what's on your mind."
     
-    def generate_voice_response(
-        self, 
-        user_context: Dict[str, Any],
-        current_message: str, 
-        strategy: Dict[str, Any]
-    ) -> str:
-        """
-        Generate a voice-optimized response (5-6 lines max).
-        Even more concise for TTS output.
+    def generate_voice_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
+        """Generate a voice-optimized, ultra-concise response for text-to-speech.
+
+        Args:
+            user_context: Aggregated identity and knowledge context.
+            current_message: The latest user input string.
+            strategy: Basic pedagogical controls.
+
+        Returns:
+            A short string (max 5-6 lines) optimized for natural speech.
         """
         prompt = f"""You are a gentle mentor. Respond for VOICE output.
 
@@ -127,15 +124,16 @@ Voice response:"""
             logger.error("Executor voice error: %s", e)
             return "I hear you. Let's explore that together."
     
-    async def generate_roadmap(
-        self, 
-        user_id: str, 
-        goal: str,
-        context: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Generate a personalized learning roadmap.
-        Returns structured roadmap data designed for direct frontend rendering.
+    async def generate_roadmap(self, user_id: str, goal: str, context: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Synthesize a personalized, multi-stage learning roadmap for a specific goal.
+
+        Args:
+            user_id: The learner for whom the roadmap is generated.
+            goal: The primary objective or topic to master.
+            context: Optional additional constraints or preferences.
+
+        Returns:
+            Structured roadmap Dict containing stages and steps, or None on failure.
         """
         from app.agents.memory_agent import MemoryAgent
         memory = MemoryAgent()
@@ -248,17 +246,17 @@ RESPOND ONLY WITH VALID JSON."""
             logger.error("Executor roadmap error: %s", e)
             return None
     
-    async def regenerate_roadmap(
-        self, 
-        user_id: str,
-        old_roadmap: Dict[str, Any],
-        feedback: List[Dict],
-        evaluator_analysis: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Regenerate a roadmap based on feedback.
-        Makes the path gentler where the user struggled.
-        Uses evaluator analysis for learning pace adjustments.
+    async def regenerate_roadmap(self, user_id: str, old_roadmap: Dict[str, Any], feedback: List[Dict], evaluator_analysis: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Adjust an existing roadmap based on learner feedback and evaluator insights.
+
+        Args:
+            user_id: The learner.
+            old_roadmap: The previous roadmap structure to be modified.
+            feedback: List of user feedback events (stuck points, clarity).
+            evaluator_analysis: Optional deep analysis of learning pace and difficulty.
+
+        Returns:
+            A modified, often simplified or refined roadmap structure.
         """
         from app.agents.planner_agent import PlannerAgent
         planner = PlannerAgent()

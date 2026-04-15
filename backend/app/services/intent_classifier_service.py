@@ -1,6 +1,8 @@
-"""
-Intent Classifier Service
-Classifies chat messages into learning intents to control evaluator behavior.
+"""Classifies chat messages into learning intents to control evaluator behavior.
+
+By distinguishing between learning, problem-solving, and casual conversation, this
+module ensures that mastery scores are only updated when a genuine learning
+interaction occurs, preventing casual chatter from corrupting cognitive data.
 """
 import logging
 import json
@@ -80,8 +82,15 @@ class IntentClassifierService:
         self.model_name = settings.GEMINI_MODEL
 
     def classify(self, message: str, message_count: int, session_history: List[str]) -> IntentResult:
-        """
-        Classifies the intent of a message in a tutoring/mentorship context.
+        """Classify the intent of a message in a tutoring/mentorship context.
+
+        Args:
+            message: The raw text input from the user.
+            message_count: The current position in the conversation to trigger heuristics.
+            session_history: List of previous message strings for contextual LLM analysis.
+
+        Returns:
+            IntentResult containing the detected intent, confidence score, and method used.
         """
         # Step 1: Heuristic pass
         if message_count < 3:
@@ -160,12 +169,14 @@ review: explicitly revisiting previously discussed content"""
         return result
 
     def should_reclassify(self, session_context: SessionContext, new_message: str) -> bool:
-        """
-        Determines if the current intent should be re-evaluated.
-        Returns True if:
-        - intent is "unknown" AND message_count >= 3
-        - intent is NOT "unknown" AND message_count % 10 == 0
-        - intent is "casual" AND any LEARNING_KEYWORDS found in new_message
+        """Determine if the current session intent should be re-evaluated.
+
+        Args:
+            session_context: The current L3 working memory containing message count and intent.
+            new_message: The latest message to check for intent shifts (e.g. casual to learning).
+
+        Returns:
+            True if a re-classification pass is required based on heuristic or keyword triggers.
         """
         msg_lower = new_message.lower()
         msg_count = session_context.message_count
@@ -181,9 +192,14 @@ review: explicitly revisiting previously discussed content"""
         return False
 
     def extract_profile_signals(self, message: str, session_history: List[str]) -> ProfileSignals:
-        """
-        Extracts soft signals about the user to help build their UserProfile over time.
-        Deterministic - no LLM calls.
+        """Extract soft signal data to refine the learner's identity model (Layer 1).
+
+        Args:
+            message: The current user message to scan for technical terms and style.
+            session_history: Contextual history (currently unused but preserved for future signals).
+
+        Returns:
+            ProfileSignals containing detected interests, vocabulary level, and style.
         """
         msg_lower = message.lower()
         words = message.split()

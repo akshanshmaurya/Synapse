@@ -1,11 +1,8 @@
-"""
-Planner Agent
-Decides guidance strategy based on structured three-layer context (Phase 4.7).
-Outputs structured JSON decisions — no natural language.
+"""Synthesizes pedagogical strategies based on user context and intent.
 
-Momentum-aware strategy overrides are applied BEFORE the LLM call. These are
-deterministic, hard-coded rules that the LLM cannot override — same philosophy
-as the evaluator's confusion fail-safe.
+By deciding on the optimal tone, verbosity, and teaching approach (e.g., Socratic,
+Direct, Redirect), this agent ensures that every mentor response is perfectly
+calibrated to the learner's current cognitive state and immediate goals.
 """
 
 from google import genai
@@ -159,29 +156,15 @@ class PlannerAgent:
     # NEW: Session-aware planning
     # =========================================================================
 
-    async def plan_response_v2(
-        self, user_context: Dict[str, Any], current_message: str
-    ) -> Dict[str, Any]:
-        """
-        Plan the response strategy using structured three-layer context.
-
-        This replaces the original plan_response() for the new orchestrator flow.
-        It uses profile, session, and concept data to make informed decisions.
-
-        Steps:
-            1. Extract context layers
-            2. Apply deterministic momentum overrides (pre-LLM)
-            3. Call LLM for nuanced strategy
-            4. Apply post-LLM overrides (enforce deterministic rules)
-            5. Persist session_goal_inference if detected
+    async def plan_response_v2(self, user_context: Dict[str, Any], current_message: str) -> Dict[str, Any]:
+        """Formulate a detailed pedagogical strategy for the next response.
 
         Args:
             user_context: Structured dict from MemoryAgent.retrieve_context().
-            current_message: The user's message.
+            current_message: The latest input from the user.
 
         Returns:
-            Strategy dict with keys: strategy, tone, pacing, focus_concepts,
-            should_assess, session_goal_inference, plus legacy fields.
+            Strategy dict containing approach, tone, and specific instructions for Executor.
         """
         profile = user_context.get("profile", {})
         session = user_context.get("session", {})

@@ -1,14 +1,8 @@
-"""
-Concept Prerequisite Graph
+"""Encodes dependency relationships between concepts using Vygotsky's Zone of Proximal Development.
 
-Encodes the dependency relationships between concepts.
-A concept's prerequisites must be sufficiently mastered before the
-concept itself can be effectively taught — based on Vygotsky's Zone
-of Proximal Development (1978).
-
-This is a STATIC graph — it represents domain knowledge, not user state.
-User-specific readiness is computed by combining this graph with the
-user's ConceptMemory mastery scores.
+By defining which concepts must be mastered before others, this graph
+enables the system to calculate user-specific readiness and ensure that
+the learner is always presented with optimally challenging material.
 """
 from typing import List, Set, Dict
 
@@ -184,7 +178,14 @@ PREREQUISITE_MASTERY_THRESHOLD = 0.5
 
 
 def get_prerequisites(concept_id: str) -> List[str]:
-    """Return direct prerequisite concept_ids for a given concept."""
+    """Return direct prerequisite concept_ids for a given concept.
+
+    Args:
+        concept_id: The slugified identifier of the target concept.
+
+    Returns:
+        List of concept_ids required before learning the target.
+    """
     concept = PREREQUISITE_GRAPH.get(concept_id)
     if not concept:
         return []
@@ -192,9 +193,14 @@ def get_prerequisites(concept_id: str) -> List[str]:
 
 
 def get_all_prerequisites(concept_id: str) -> Set[str]:
-    """Return ALL prerequisites (transitive) using DFS.
-    If recursion requires functions, and functions requires loops,
-    then all_prerequisites(recursion) = {functions, loops}."""
+    """Return the complete transitive set of prerequisites for a concept.
+
+    Args:
+        concept_id: The slugified identifier of the target concept.
+
+    Returns:
+        Set of all concept_ids that must be mastered upstream.
+    """
     visited = set()
     stack = get_prerequisites(concept_id).copy()
     while stack:
@@ -206,8 +212,14 @@ def get_all_prerequisites(concept_id: str) -> Set[str]:
 
 
 def get_dependents(concept_id: str) -> List[str]:
-    """Return concepts that list this concept as a prerequisite.
-    Useful for: 'now that user mastered X, what's unlocked?'"""
+    """Return a list of concepts that depend on the given concept.
+
+    Args:
+        concept_id: The slugified identifier of the foundational concept.
+
+    Returns:
+        List of concept_ids that list this concept as a prerequisite.
+    """
     dependents = []
     for cid, data in PREREQUISITE_GRAPH.items():
         if concept_id in data["prerequisites"]:
@@ -218,16 +230,12 @@ def get_dependents(concept_id: str) -> List[str]:
 def is_in_zpd(concept_id: str, user_mastery: Dict[str, float]) -> bool:
     """Check if a concept is in the user's Zone of Proximal Development.
 
-    A concept is in the ZPD if:
-    1. The user hasn't mastered it yet (mastery < 0.7)
-    2. ALL prerequisites are sufficiently mastered (>= threshold)
-
     Args:
-        concept_id: The concept to check
-        user_mastery: Dict of {concept_id: mastery_score} from ConceptMemory
+        concept_id: The concept to check.
+        user_mastery: Dict mapping concept_ids to current mastery scores.
 
     Returns:
-        True if the concept is in the user's ZPD
+        True if the concept is teacheable (prereqs met) but not yet mastered.
     """
     # Already mastered — not in ZPD (Zone 1)
     current_mastery = user_mastery.get(concept_id, 0.0)
@@ -249,13 +257,16 @@ def is_in_zpd(concept_id: str, user_mastery: Dict[str, float]) -> bool:
     return True
 
 
-def get_zpd_concepts(user_mastery: Dict[str, float],
-                     domain: str = None) -> List[str]:
-    """Return all concepts currently in the user's ZPD.
-    Optionally filter by domain.
+def get_zpd_concepts(user_mastery: Dict[str, float], domain: str = None) -> List[str]:
+    """Return all concepts currently eligible for teaching based on ZPD logic.
 
-    These are the concepts the system SHOULD be teaching —
-    they're the sweet spot where learning is most effective."""
+    Args:
+        user_mastery: Dict mapping concept_ids to current mastery scores.
+        domain: Optional domain filter (e.g., 'python', 'dsa').
+
+    Returns:
+        List of concept_ids that hit the pedagogical 'sweet spot'.
+    """
     zpd = []
     for concept_id, data in PREREQUISITE_GRAPH.items():
         if domain and data["domain"] != domain:

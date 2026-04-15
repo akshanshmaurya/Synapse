@@ -1,12 +1,8 @@
-"""
-Evaluator Agent
-Analyzes interactions to detect struggles, extract concepts, and update
-strategy effectiveness. Updates both session-scoped memory (Phase 4.7)
-and legacy global memory for backward compatibility.
+"""Analyzes learners' performance and cognitive state from conversation logs.
 
-CRITICAL: The confusion fail-safe (lines ~106-131 in the original) is
-UNTOUCHABLE. It runs before concept extraction. If confusion is detected,
-concept clarity scores are capped too.
+By detecting concept mastery, frustration signals, and intention clarity,
+this agent provides the critical feedback signal that allows the system's
+memory to evolve and adapt to the user's growing expertise.
 """
 
 import time
@@ -37,21 +33,16 @@ class EvaluatorAgent:
         mentor_response: str,
         user_context: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """
-        Evaluate an interaction using structured three-layer context.
-
-        This replaces evaluate_interaction() for the new orchestrator flow.
-        Adds concept extraction to the LLM prompt and enforces the confusion
-        fail-safe before any concept scores are returned.
+        """Perform a deep pedagogical analysis of the latest interaction.
 
         Args:
+            user_id: The unique identifier of the learner.
             user_message: What the student said.
             mentor_response: What the mentor replied.
             user_context: Structured dict from MemoryAgent.retrieve_context().
 
         Returns:
-            Evaluation dict including concepts_discussed, concept_clarity,
-            and misconceptions_detected in addition to all original fields.
+            Analysis dict containing mastery updates, clarity scores, and pace signals.
         """
         profile = user_context.get("profile", {})
         session = user_context.get("session", {})
@@ -339,22 +330,16 @@ RESPOND ONLY WITH VALID JSON."""
         session_domain: Optional[str],
         evaluation: Dict[str, Any],
     ) -> None:
-        """
-        Write evaluation results to session context and concept memory.
-
-        This runs as part of the background task pipeline. It writes to:
-            1. Session context (clarity, confusion points) — via SessionContextService
-            2. Concept memory (per-concept mastery) — via ConceptMemoryService
-            3. Legacy user_memory — via the old update_memory_from_evaluation (kept for dashboard)
-
-        If concept extraction failed (empty/malformed), concept writes are skipped
-        with a warning log.
+        """Write evaluation results to session context and concept memory.
 
         Args:
-            user_id: The learner.
-            session_id: Current chat session id.
-            session_domain: Domain from SessionContext (e.g. "dsa"), or None.
-            evaluation: Full evaluation dict from evaluate_interaction_v2().
+            user_id: The unique identifier of the learner.
+            session_id: The identifier of the active conversation session.
+            session_domain: The domain category of the session.
+            evaluation: The structured assessment data from the evaluation step.
+
+        Returns:
+            None. Updates are dispatched to memory services for persistence.
         """
         # --- Session-scoped clarity update ---
         try:

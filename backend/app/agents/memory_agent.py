@@ -1,15 +1,8 @@
-"""
-Memory Agent
-Context assembler for the three-layer memory architecture (Phase 4.7).
+"""Orchestrates data flow between the 3-layer memory system and the multi-agent pipeline.
 
-The MemoryAgent acts as a **facade** — the orchestrator talks only to this agent,
-which coordinates the three underlying services:
-    - ProfileService      (Layer 1: Identity Memory)
-    - ConceptMemoryService (Layer 2: Knowledge Map)
-    - SessionContextService (Layer 3: Working Memory)
-
-The agent itself does NOT touch MongoDB directly. All persistence is delegated
-to the services above.
+By centralizing context retrieval and memory updates, this agent ensures that
+all other specialized agents (Planner, Evaluator, Executor) have access to the
+most relevant user facts and cognitive state at any point in the conversation.
 """
 
 import time
@@ -47,24 +40,15 @@ class MemoryAgent:
     async def retrieve_context(
         self, user_id: str, session_id: str, message: str
     ) -> dict:
-        """
-        Assemble a structured context dict from all three memory layers.
-
-        This is the primary entry point for the orchestrator. Returns a dict
-        with keys: profile, session, concepts, recent_messages, context_summary,
-        and _timing (for performance tracking).
-
-        If any layer fails, the error is logged and a partial context is returned
-        with a _missing list indicating which layers are unavailable.
+        """Aggregate all memory layers into a single context object for the planner.
 
         Args:
-            user_id: The learner.
-            session_id: Current chat/session id.
-            message: The user's current message (unused for now, reserved for
-                     future intent-based pre-fetching).
+            user_id: The unique identifier of the learner.
+            session_id: The active conversation session identifier.
+            message: The user's current message (reserved for pre-fetching).
 
         Returns:
-            Structured context dict suitable for passing to the planner.
+            Structured context dict containing profile, session, and concept data.
         """
         missing: list = []
         timing: dict = {}
@@ -192,27 +176,16 @@ class MemoryAgent:
     async def update_memory(
         self, user_id: str, session_id: str, evaluation_result: dict
     ) -> None:
-        """
-        Dispatch evaluation results to the appropriate memory layers.
-
-        Called by the orchestrator after the evaluator scores an interaction.
-        Updates are independent and any individual failure is logged but does
-        not prevent the others from running.
-
-        Layers updated:
-            - Session (always): clarity, confusion points, message count
-            - Concepts (if identified): mastery per concept
-            - Profile (rare): strengths/weaknesses only on global pattern detection
+        """Dispatch evaluation results to the appropriate memory layers.
 
         Args:
-            user_id: The learner.
-            session_id: Current chat/session id.
-            evaluation_result: Dict from the evaluator, expected keys:
-                - clarity_score (float, 0-100)
-                - confusion_points (list of str, optional)
-                - concepts (list of dicts with concept_name, domain, clarity, optional misconceptions)
-                - global_strengths (list of str, optional — only when evaluator detects patterns)
-                - global_weaknesses (list of str, optional)
+            user_id: The unique identifier of the learner.
+            session_id: Current chat session identifier.
+            evaluation_result: Structured dict from Evaluator containing clarity,
+                               mastery, and pattern signals.
+
+        Returns:
+            None. Updates are applied asynchronously across all three layers.
         """
         # --- Session layer (always) ---
         try:
@@ -287,12 +260,14 @@ class MemoryAgent:
         user_id: str,
         signals: ProfileSignals
     ) -> None:
-        """
-        Update UserProfile with soft signals extracted from any conversation.
-        These signals accumulate gradually and are used for user profiling,
-        not for learning assessment.
-        
-        Called regardless of session_intent — even casual sessions contribute.
+        """Update UserProfile with soft signals extracted from any conversation.
+
+        Args:
+            user_id: The unique identifier of the learner.
+            signals: Soft signals like interests, goals, and vocabulary level.
+
+        Returns:
+            None. Performs non-blocking updates to the identity memory layer.
         """
         
         if not signals.detected_interests and not signals.vocabulary_level and not signals.implicit_goals:

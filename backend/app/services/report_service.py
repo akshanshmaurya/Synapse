@@ -1,13 +1,8 @@
-"""
-Report Service
-Aggregates signal data from across all memory layers and collections to
-generate a comprehensive learning outcome report for the user.
+"""Aggregates learning data to generate comprehensive performance reports.
 
-Cognitive science rationale:
-    Surfacing learning outcomes serves as a meta-cognitive reflection tool.
-    By making the invisible progress markers (concept mastery, clarity trends,
-    trajectory) visible to the user, we reinforce their mental model of their
-    own learning journey (metacognition).
+By synthesizing signals across all memory layers—profile, concepts, and
+sessions—this service creates a holistic view of the learner's journey,
+surfacing mastery gains and identifying persistent struggle areas.
 """
 
 import logging
@@ -30,14 +25,13 @@ class ReportService:
     """
 
     async def generate_report(self, user_id: str) -> Dict[str, Any]:
-        """
-        Assemble a structured report from all memory layers.
+        """Assemble a structured learning report from all memory layers.
 
         Args:
-            user_id: The learner ID.
+            user_id: The unique identifier of the learner.
 
         Returns:
-            A structured dict containing profile, concepts, stats, and roadmap progress.
+            Structured dict containing profile metrics, concept mastery, and session stats.
         """
         # 1. Profile Data (Layer 1)
         profile_col = get_user_profiles_collection()

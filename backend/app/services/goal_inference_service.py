@@ -1,6 +1,8 @@
-"""
-Goal Inference Service
-Infers a learning goal from the user's initial messages if none is explicitly set.
+"""Infers a learning goal from the user's initial messages if none is explicitly set.
+
+By proactively identifying the learner's intent at the third message, this module
+aligns the mentor's strategy with the user's actual needs, preventing aimless
+interactions caused by missing or vague initial objectives.
 """
 import logging
 from dataclasses import dataclass
@@ -44,9 +46,14 @@ class GoalInferenceService:
         self.model_name = settings.GEMINI_MODEL
 
     def infer_goal(self, session_history: List[str], session_domain: Optional[str]) -> GoalInferenceResult:
-        """
-        Infers a specific learning goal using deterministic heuristic filtering followed by a single LLM pass.
-        Runs exactly at message_count == 3.
+        """Infer a specific learning goal using deterministic heuristic filtering followed by a single LLM pass.
+
+        Args:
+            session_history: List of current messages in the session.
+            session_domain: Optional domain identified earlier in the pipeline.
+
+        Returns:
+            GoalInferenceResult containing the inferred goal and confidence metrics.
         """
         combined_messages = " ".join(session_history).lower()
 
@@ -151,9 +158,13 @@ Reply with ONLY the goal string. No explanation. No punctuation at the end."""
         return result
 
     def should_infer(self, session_context: SessionContext) -> bool:
-        """
-        Determines if we should run goal inference.
-        True if msg_count == 3, goal is None, intent is learning/problem_solving/unknown.
+        """Determine if goal inference should be triggered based on current session state.
+
+        Args:
+            session_context: The L3 working memory used to evaluate message count and intent.
+
+        Returns:
+            True if the conditions for inference (msg_count == 2, no goal set) are satisfied.
         """
         if session_context.goal_confirmed or session_context.goal_inferred or session_context.session_goal is not None:
             return False
