@@ -514,3 +514,43 @@ export async function fetchDashboardRecommendations(): Promise<DashboardRecommen
     }
 }
 
+
+// ─── Learning Report API (Phase 7.3) ─────────────────────────────────
+
+export interface LearningReport {
+  generated_at: string;
+  profile: {
+    experience_level: string;
+    career_interests: string[];
+    mentoring_tone: string;
+  };
+  concepts: {
+    total_tracked: number;
+    top_mastery: { name: string; mastery: number; domain: string }[];
+    needs_work: { name: string; mastery: number; domain: string }[];
+    domains_covered: string[];
+  };
+  learning_stats: {
+    total_sessions: number;
+    consistency_streak: number;
+    clarity_trend: string;
+    total_evaluations: number;
+  };
+  roadmap_progress: {
+    total_roadmaps: number;
+    latest_roadmap_title: string;
+  };
+}
+
+export async function fetchLearningReport(): Promise<LearningReport | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/user/report`, {
+            credentials: 'include',
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+

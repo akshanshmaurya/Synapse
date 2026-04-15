@@ -26,6 +26,7 @@ from app.core.rate_limiter import rate_limit
 from app.db.mongodb import MongoDB, get_user_memory_collection
 from app.services.agent_orchestrator import AgentOrchestrator
 from app.auth.dependencies import get_current_user, get_current_user_optional
+from app.services.report_service import report_service
 from app.utils.logger import logger
 
 
@@ -581,7 +582,6 @@ async def get_user_memory(current_user: dict = Depends(get_current_user)):
 
     return {"memory": memory}
 
-
 @app.get("/api/user/dashboard")
 async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
     """Get derived dashboard insights for the user."""
@@ -591,6 +591,13 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
     service = DashboardService()
 
     return await service.get_dashboard_insights(user_id)
+
+
+@app.get("/api/user/report")
+async def get_learning_report(current_user: dict = Depends(get_current_user)):
+    """Return a comprehensive learning outcome report for the user."""
+    user_id = str(current_user["_id"])
+    return await report_service.generate_report(user_id)
 
 
 @app.put("/api/user/profile")

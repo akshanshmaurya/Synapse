@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, MessageSquare, Map, User, Settings, Sprout } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Map, User, Settings, Sprout, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
@@ -10,6 +10,7 @@ export function Sidebar() {
         { icon: MessageSquare, label: "Mentors", path: "/mentor" },
         { icon: Map, label: "Roadmap", path: "/roadmap" },
         { icon: User, label: "Profile", path: "/profile" },
+        { icon: FileText, label: "My Report", path: "/report" },
     ];
 
     return (
