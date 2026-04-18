@@ -33,6 +33,7 @@ const DOMAIN_COLORS: Record<string, string> = {
     web: "#F59E0B",
     ml: "#8B5CF6",
     system_design: "#EC4899",
+    professional_skills: "#D97706",
     career: "#D4A574",
 };
 
@@ -42,6 +43,7 @@ const DOMAIN_LABELS: Record<string, string> = {
     web: "Web Dev",
     ml: "ML / AI",
     system_design: "System Design",
+    professional_skills: "Professional Skills",
     career: "Career",
     unknown: "General",
 };

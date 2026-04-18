@@ -192,6 +192,11 @@ export interface ChatMessage {
     timestamp: string;
 }
 
+export interface DeleteChatResult {
+    success: boolean;
+    error?: string;
+}
+
 /**
  * Fetch paginated chat session history for the authenticated user.
  *
@@ -265,17 +270,30 @@ export async function createChatSession(title?: string): Promise<string | null> 
  * Delete a chat session and all its messages.
  *
  * @param chatId - The chat session ID to delete.
- * @returns True if deletion succeeded, false otherwise.
+ * @returns Success state and optional error message.
  */
-export async function deleteChatSession(chatId: string): Promise<boolean> {
+export async function deleteChatSession(chatId: string): Promise<DeleteChatResult> {
     try {
         const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
             method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
         });
-        return response.ok;
+        if (response.ok) {
+            return { success: true };
+        }
+
+        let error = 'Failed to delete chat.';
+        try {
+            const data = await response.json();
+            error = data.message || data.detail || error;
+        } catch {
+            error = `Failed to delete chat (${response.status}).`;
+        }
+
+        return { success: false, error };
     } catch {
-        return false;
+        return { success: false, error: 'Network error while deleting chat.' };
     }
 }
 
@@ -407,6 +425,7 @@ export async function updateUserProfile(interests?: string[], goals?: string[]):
 
         const response = await fetch(`${API_URL}/api/user/profile?${params}`, {
             method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
         });
         return response.ok;
@@ -503,6 +522,7 @@ export async function regenerateRoadmap(roadmapId: string): Promise<Record<strin
     try {
         const response = await fetch(`${API_URL}/api/roadmap/regenerate/${roadmapId}`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
         });
         if (!response.ok) return null;
@@ -683,4 +703,3 @@ export async function fetchLearningReport(): Promise<LearningReport | null> {
         return null;
     }
 }
-

@@ -116,7 +116,11 @@ export default function RoadmapPage() {
         if (!roadmap) return;
         setIsRegenerating(true);
         try {
-            const response = await fetch(`${API_URL}/api/roadmap/regenerate?roadmap_id=${roadmap._id}`, { method: "POST", credentials: 'include' });
+            const response = await fetch(`${API_URL}/api/roadmap/regenerate?roadmap_id=${roadmap._id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: 'include'
+            });
             const data = await response.json();
             setRoadmap(data.roadmap);
             setMessage(data.message);

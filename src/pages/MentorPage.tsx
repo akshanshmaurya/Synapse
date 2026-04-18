@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Leaf, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History, Plus, X, Trash2, Network, Brain } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, createChatSession, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
+import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
 import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 import { useSessionContext } from "@/hooks/useSessionContext";
 import { useMentorSocket } from "@/hooks/use-mentor-socket";
@@ -57,10 +57,52 @@ export default function MentorPage() {
     }, []);
 
     // Chat history state
-    const [chatId, setChatId] = useState<string | null>(null);
+    // Initialize chatId from sessionStorage — empty after login, preserved across navigation
+    const [chatId, setChatId] = useState<string | null>(() => {
+        try { return sessionStorage.getItem("synapse_active_chat_id"); } catch { return null; }
+    });
     const [showHistory, setShowHistory] = useState(false);
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const chatCreationRequestRef = useRef(0);
+    const hasRestoredSessionRef = useRef(false);
+
+    // ── Persist chatId to sessionStorage on every change ──────────
+    useEffect(() => {
+        try {
+            if (chatId) sessionStorage.setItem("synapse_active_chat_id", chatId);
+            else sessionStorage.removeItem("synapse_active_chat_id");
+        } catch {}
+    }, [chatId]);
+
+    // ── Restore messages on mount if returning to a persisted session
+    useEffect(() => {
+        if (hasRestoredSessionRef.current) return;
+        hasRestoredSessionRef.current = true;
+        if (!chatId) return; // No persisted session → stay on Welcome
+
+        (async () => {
+            try {
+                const messages = await fetchChatMessages(chatId);
+                if (messages.length > 0) {
+                    setReflections(messages.map((msg: ChatMessage) => ({
+                        id: msg._id,
+                        type: msg.sender === "user" ? "thought" : "guidance",
+                        content: msg.content,
+                        timestamp: new Date(msg.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                    })));
+                } else {
+                    // Session exists but has 0 messages — stale, reset
+                    setChatId(null);
+                }
+            } catch {
+                // Session was deleted or invalid — reset to Welcome
+                setChatId(null);
+            }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── WebSocket streaming state ─────────────────────────────────
     const streamingContentRef = useRef("");
@@ -100,7 +142,7 @@ export default function MentorPage() {
             }]);
         } else {
             // Append subsequent tokens
-            streamingContentRef.current += " " + token;
+            streamingContentRef.current += token;
             const currentContent = streamingContentRef.current;
             const currentId = streamingBubbleIdRef.current;
             setReflections(prev => prev.map(r =>
@@ -188,12 +230,34 @@ export default function MentorPage() {
 
     const loadChatSessions = async () => {
         setLoadingHistory(true);
+        setHistoryError(null);
         const sessions = await fetchChatSessions(20, 0);
         setChatSessions(sessions);
         setLoadingHistory(false);
     };
 
+    // ── Local-only reset for "new chat pending" state ──────────────
+    // No database write happens here. A session is only created when
+    // the user actually sends their first message (lazy init).
+    const resetToNewChat = useCallback(() => {
+        setChatId(null);
+        setReflections([{
+            id: "welcome",
+            type: "guidance",
+            content: "Welcome to this quiet space. I've been reflecting on your journey — the seeds you've planted, the growth you've nurtured.\n\nWhat's stirring in your mind today? There's no rush to answer. Take your time.",
+            timestamp: "Just now"
+        }]);
+        streamingBubbleIdRef.current = null;
+        streamingContentRef.current = "";
+        setInput("");
+        setIsReflecting(false);
+        setShowHistory(false);
+        setHistoryError(null);
+    }, []);
+
     const handleSelectSession = async (session: ChatSession) => {
+        chatCreationRequestRef.current += 1;
+        setHistoryError(null);
         setChatId(session._id);
         setShowHistory(false);
         const messages = await fetchChatMessages(session._id);
@@ -208,35 +272,29 @@ export default function MentorPage() {
         }
     };
 
-    const handleNewChat = async () => {
-        const newChatId = await createChatSession();
-        if (newChatId) {
-            setChatId(newChatId);
-            setReflections([{
-                id: "welcome",
-                type: "guidance",
-                content: "A fresh beginning. What would you like to explore today?",
-                timestamp: "Just now"
-            }]);
-            setShowHistory(false);
-        }
+    const handleNewChat = () => {
+        resetToNewChat();
     };
 
     const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
         e.stopPropagation();
-        const success = await deleteChatSession(sessionId);
-        if (success) {
+        setHistoryError(null);
+        const result = await deleteChatSession(sessionId);
+        if (result.success) {
             setChatSessions(prev => prev.filter(s => s._id !== sessionId));
             if (chatId === sessionId) {
-                setChatId(null);
+                resetToNewChat();
             }
+            return;
         }
+        setHistoryError(result.error || "Unable to delete that chat.");
     };
 
     // ── Submit: WS primary, REST silent fallback ──────────────────
     const handleSubmit = async () => {
         if (!input.trim()) return;
         const userText = input.trim();
+        setHistoryError(null);
         const thought: Reflection = {
             id: Date.now().toString(),
             type: "thought",
@@ -251,16 +309,17 @@ export default function MentorPage() {
         streamingBubbleIdRef.current = null;
         streamingContentRef.current = "";
 
-        // ── Try WebSocket first ───────────────────────────────────
-        const sentViaWs = wsSendMessage(userText);
-        if (sentViaWs) {
-            // WS handlers (onToken/onDone/onError) will manage the response.
-            // isReflecting stays true until first token or done arrives.
+        // ── Try WebSocket first (only for established sessions) ────
+        // Skip WS when chatId is null to avoid race conditions during
+        // the "new" → real session transition. REST handles it atomically.
+        if (chatId && wsSendMessage(userText)) {
             pendingUserMessageRef.current = userText;
             return;
         }
 
         // ── REST fallback (WS not connected) ──────────────────────
+        // When chatId is null, sendMessage() omits chat_id from the
+        // request body — the backend creates a session automatically.
         try {
             const result = await restSendMessage(userText, chatId || undefined);
             if (result.chatId && !chatId) {
@@ -301,6 +360,7 @@ export default function MentorPage() {
     };
 
     const handleLogout = () => {
+        try { sessionStorage.removeItem("synapse_active_chat_id"); } catch {}
         logout();
         navigate("/");
     };
@@ -484,7 +544,11 @@ export default function MentorPage() {
                                         </button>
                                     </div>
 
-                                    {loadingHistory ? (
+                                    {historyError ? (
+                                        <div className="py-4 px-4 rounded-2xl border border-red-200 bg-red-50/70 text-sm text-red-600">
+                                            {historyError}
+                                        </div>
+                                    ) : loadingHistory ? (
                                         <div className="flex items-center gap-3 py-6 justify-center">
                                             <span className="w-4 h-4 border-2 border-[#5C6B4A]/20 border-t-[#5C6B4A] rounded-full animate-spin" />
                                             <span className="text-sm text-[#8B8178]">Loading...</span>

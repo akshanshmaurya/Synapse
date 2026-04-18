@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { API_URL } from "@/config/env";
-import { sendMessage, createChatSession, fetchChatMessages, fetchChatSessions } from "@/services/api";
+import { sendMessage, createChatSession, fetchChatMessages, fetchChatSessions, deleteChatSession } from "@/services/api";
 
 describe("Chat API functions", () => {
     beforeEach(() => {
@@ -132,6 +132,27 @@ describe("Chat API functions", () => {
 
             const result = await fetchChatMessages("bad-id");
             expect(result).toEqual([]);
+        });
+    });
+
+    describe("deleteChatSession", () => {
+        it("returns success when deletion succeeds", async () => {
+            vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+                new Response(JSON.stringify({ success: true }), { status: 200 })
+            );
+
+            const result = await deleteChatSession("chat-1");
+            expect(result).toEqual({ success: true });
+        });
+
+        it("returns backend error details on failure", async () => {
+            vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+                new Response(JSON.stringify({ message: "Chat not found or not owned by user" }), { status: 404 })
+            );
+
+            const result = await deleteChatSession("chat-1");
+            expect(result.success).toBe(false);
+            expect(result.error).toContain("Chat not found");
         });
     });
 });
