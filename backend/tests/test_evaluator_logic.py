@@ -7,6 +7,7 @@ import json
 import pytest
 from unittest.mock import MagicMock
 from app.agents.evaluator_agent import EvaluatorAgent
+from app.services.concept_memory_service import normalize_extracted_concepts
 
 def _mock_response(text: str):
     m = MagicMock()
@@ -118,3 +119,24 @@ class TestRoadmapFeedbackAnalysis:
         result = self.evaluator.analyze_roadmap_feedback(feedback, {"profile": {"learning_pace": "moderate"}})
         assert result["action"] == "simplify"
         assert result["should_simplify"] is True
+
+
+class TestConceptFiltering:
+    def test_normalize_extracted_concepts_rejects_generic_words(self):
+        normalized = normalize_extracted_concepts(
+            concepts=["improving", "growth", "system design", "machine learning", "communication"],
+            concept_clarity={"system design": 82, "machine learning": 76, "communication": 65},
+            session_domain="web",
+        )
+
+        names = {item["concept_name"] for item in normalized}
+        domains = {item["concept_name"]: item["domain"] for item in normalized}
+
+        assert "Improving" not in names
+        assert "Growth" not in names
+        assert "System Design" in names
+        assert "Machine Learning" in names
+        assert "Communication" in names
+        assert domains["System Design"] == "system_design"
+        assert domains["Machine Learning"] == "ml"
+        assert domains["Communication"] == "professional_skills"

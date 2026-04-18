@@ -358,6 +358,44 @@ class TestPipelineResultShape:
         means a user strong in Python but struggling with DSA will see their
         DSA session clarity at 30, not their global average of 60.
         """
+
+
+class TestPipelineStreaming:
+
+    @patch(TRACE_SVC)
+    @patch(CHAT_SVC)
+    @patch(SESSION_CTX_SVC)
+    async def test_stream_pipeline_emits_incremental_chunks_and_persists_final_response(
+        self, mock_session_svc, mock_chat_svc, mock_trace_svc
+    ):
+        _patch_session_service(mock_session_svc)
+        _patch_chat_service(mock_chat_svc)
+        _patch_trace_service(mock_trace_svc)
+
+        orch = _setup_orchestrator()
+        _setup_agents(orch, response="fallback")
+        orch.executor_agent.generate_response_stream = MagicMock(
+            return_value=iter(["Hello", " world"])
+        )
+
+        streamed = []
+
+        async def on_token(chunk: str):
+            streamed.append(chunk)
+
+        result = await orch.process_message_stream_async(
+            "user-1",
+            "Explain recursion",
+            on_token=on_token,
+        )
+        await orch.wait_for_background_tasks()
+
+        assert streamed == ["Hello", " world"]
+        assert result["response"] == "Hello world"
+        assert mock_chat_svc.add_message.await_count == 2
+        mentor_write = mock_chat_svc.add_message.await_args_list[1].kwargs
+        assert mentor_write["sender"] == MessageSender.MENTOR
+        assert mentor_write["content"] == "Hello world"
         v2_ctx = _mock_v2_context(clarity=35.0)
 
         _patch_session_service(mock_session_svc)

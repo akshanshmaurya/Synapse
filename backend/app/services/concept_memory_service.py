@@ -34,10 +34,11 @@ Mastery formula:
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from app.db.mongodb import get_concept_memory_collection
 from app.models.memory_v2 import UserConceptMemory, ConceptRecord, MasterySnapshot
+from app.knowledge.prerequisite_graph import PREREQUISITE_GRAPH
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,98 @@ logger = logging.getLogger(__name__)
 
 _SLUG_RE = re.compile(r"[^a-z0-9-]")
 _MULTI_HYPHEN_RE = re.compile(r"-{2,}")
+_SPACE_RE = re.compile(r"\s+")
+
+_REJECTED_CONCEPT_SLUGS = {
+    "improving",
+    "improvement",
+    "growth",
+    "growing",
+    "learning",
+    "understanding",
+    "knowledge",
+    "development",
+    "self-development",
+    "self-improvement",
+    "progress",
+    "practice",
+    "coding",
+    "programming",
+    "skill",
+    "skills",
+}
+
+_CANONICAL_TECH_CONCEPTS = {
+    "system-design": ("System Design", "system_design"),
+    "software-engineering": ("Software Engineering", "professional_skills"),
+    "web-development": ("Web Development", "web"),
+    "backend-development": ("Backend Development", "web"),
+    "frontend-development": ("Frontend Development", "web"),
+    "api-design": ("API Design", "system_design"),
+    "rest-api": ("REST API", "system_design"),
+    "machine-learning": ("Machine Learning", "ml"),
+    "deep-learning": ("Deep Learning", "ml"),
+    "artificial-intelligence": ("Artificial Intelligence", "ml"),
+    "python": ("Python", "python"),
+    "javascript": ("JavaScript", "web"),
+    "typescript": ("TypeScript", "web"),
+    "react": ("React", "web"),
+    "django": ("Django", "python"),
+    "fastapi": ("FastAPI", "python"),
+    "flask": ("Flask", "python"),
+    "data-structures": ("Data Structures", "dsa"),
+    "algorithms": ("Algorithms", "dsa"),
+}
+
+_PROFESSIONAL_SKILL_CONCEPTS = {
+    "communication": "Communication",
+    "technical-communication": "Technical Communication",
+    "interview-preparation": "Interview Preparation",
+    "resume-writing": "Resume Writing",
+    "career-planning": "Career Planning",
+    "presentation-skills": "Presentation Skills",
+    "collaboration": "Collaboration",
+    "ai-engineer": "AI Engineer",
+    "software-engineer": "Software Engineer",
+}
+
+_CONCEPT_ALIASES = {
+    "system design": "system-design",
+    "software development": "software-engineering",
+    "software engineering": "software-engineering",
+    "web dev": "web-development",
+    "backend": "backend-development",
+    "frontend": "frontend-development",
+    "rest api": "rest-api",
+    "api": "api-design",
+    "ml": "machine-learning",
+    "machine learning": "machine-learning",
+    "deep learning": "deep-learning",
+    "ai": "artificial-intelligence",
+    "artificial intelligence": "artificial-intelligence",
+    "javascript": "javascript",
+    "typescript": "typescript",
+    "reactjs": "react",
+    "react js": "react",
+    "data structures": "data-structures",
+    "algorithms": "algorithms",
+    "interview prep": "interview-preparation",
+    "technical interview": "interview-preparation",
+    "resume": "resume-writing",
+    "communication skills": "communication",
+    "technical communication": "technical-communication",
+    "ai engineer": "ai-engineer",
+    "software engineer": "software-engineer",
+}
+
+_DOMAIN_SIGNAL_KEYWORDS = {
+    "python": {"python", "django", "fastapi", "flask", "pandas", "numpy"},
+    "web": {"web", "frontend", "backend", "react", "javascript", "typescript", "css", "html"},
+    "ml": {"ml", "machine learning", "deep learning", "neural", "model", "dataset", "training", "ai"},
+    "dsa": {"array", "linked list", "tree", "graph", "recursion", "algorithm", "data structure"},
+    "system_design": {"system design", "api", "database", "scalability", "architecture", "distributed", "cache"},
+    "professional_skills": {"interview", "resume", "communication", "presentation", "career", "collaboration"},
+}
 
 
 def slugify_concept(name: str) -> str:
@@ -63,6 +156,129 @@ def slugify_concept(name: str) -> str:
     slug = _SLUG_RE.sub("", slug)
     slug = _MULTI_HYPHEN_RE.sub("-", slug)
     return slug.strip("-")
+
+
+def _prettify_concept_name(slug: str) -> str:
+    return " ".join(part.upper() if len(part) <= 3 else part.capitalize() for part in slug.split("-"))
+
+
+def _normalize_candidate(name: str) -> tuple[str, str]:
+    cleaned = name.strip().strip(".,:;!?")
+    cleaned = cleaned.replace("&", " and ")
+    cleaned = cleaned.replace("/", " ")
+    cleaned = _SPACE_RE.sub(" ", cleaned)
+    lowered = cleaned.lower().strip()
+    slug = slugify_concept(lowered)
+
+    alias_slug = _CONCEPT_ALIASES.get(lowered) or _CONCEPT_ALIASES.get(slug)
+    if alias_slug:
+        slug = alias_slug
+
+    if slug in PREREQUISITE_GRAPH:
+        return slug, _prettify_concept_name(slug)
+    if slug in _CANONICAL_TECH_CONCEPTS:
+        return slug, _CANONICAL_TECH_CONCEPTS[slug][0]
+    if slug in _PROFESSIONAL_SKILL_CONCEPTS:
+        return slug, _PROFESSIONAL_SKILL_CONCEPTS[slug]
+
+    return slug, _prettify_concept_name(slug)
+
+
+def _looks_like_supported_concept(name: str, slug: str, session_domain: Optional[str]) -> bool:
+    if not slug or slug in _REJECTED_CONCEPT_SLUGS:
+        return False
+    if slug.split("-")[0] in _REJECTED_CONCEPT_SLUGS:
+        return False
+    if slug in PREREQUISITE_GRAPH or slug in _CANONICAL_TECH_CONCEPTS or slug in _PROFESSIONAL_SKILL_CONCEPTS:
+        return True
+
+    lowered = name.lower()
+    if session_domain and session_domain in _DOMAIN_SIGNAL_KEYWORDS:
+        if any(keyword in lowered for keyword in _DOMAIN_SIGNAL_KEYWORDS[session_domain]):
+            return True
+
+    for keywords in _DOMAIN_SIGNAL_KEYWORDS.values():
+        if any(keyword in lowered for keyword in keywords):
+            return True
+
+    return False
+
+
+def _resolve_concept_domain(name: str, slug: str, session_domain: Optional[str]) -> Optional[str]:
+    if slug in PREREQUISITE_GRAPH:
+        return PREREQUISITE_GRAPH[slug]["domain"]
+    if slug in _CANONICAL_TECH_CONCEPTS:
+        return _CANONICAL_TECH_CONCEPTS[slug][1]
+    if slug in _PROFESSIONAL_SKILL_CONCEPTS:
+        return "professional_skills"
+
+    lowered = name.lower()
+    for domain, keywords in _DOMAIN_SIGNAL_KEYWORDS.items():
+        if any(keyword in lowered for keyword in keywords):
+            return domain
+
+    if session_domain in {"python", "web", "ml", "dsa", "system_design", "professional_skills"}:
+        return session_domain
+    if session_domain == "career":
+        return "professional_skills"
+
+    return None
+
+
+def normalize_extracted_concepts(
+    concepts: List[str],
+    concept_clarity: Optional[Dict[str, Any]] = None,
+    misconceptions: Optional[Dict[str, Any]] = None,
+    session_domain: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Normalize and filter evaluator-extracted concepts before persistence."""
+    concept_clarity = concept_clarity or {}
+    misconceptions = misconceptions or {}
+    normalized: Dict[str, Dict[str, Any]] = {}
+
+    for raw_name in concepts:
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            continue
+
+        slug, display_name = _normalize_candidate(raw_name)
+        if not _looks_like_supported_concept(display_name, slug, session_domain):
+            continue
+
+        domain = _resolve_concept_domain(display_name, slug, session_domain)
+        if not domain:
+            continue
+
+        raw_clarity = concept_clarity.get(raw_name, concept_clarity.get(display_name))
+        if not isinstance(raw_clarity, (int, float)):
+            raw_clarity = None
+
+        raw_misconceptions = misconceptions.get(raw_name, misconceptions.get(display_name, []))
+        if isinstance(raw_misconceptions, str):
+            normalized_misconceptions = [raw_misconceptions] if raw_misconceptions else []
+        elif isinstance(raw_misconceptions, list):
+            normalized_misconceptions = [
+                item for item in raw_misconceptions if isinstance(item, str) and item.strip()
+            ]
+        else:
+            normalized_misconceptions = []
+
+        existing = normalized.get(slug)
+        if existing:
+            existing["clarity_score"] = max(existing["clarity_score"], raw_clarity or 0.0)
+            existing["misconceptions"] = sorted(
+                set(existing["misconceptions"]) | set(normalized_misconceptions)
+            )
+            continue
+
+        normalized[slug] = {
+            "concept_id": slug,
+            "concept_name": display_name,
+            "domain": domain,
+            "clarity_score": float(raw_clarity) if raw_clarity is not None else 0.0,
+            "misconceptions": normalized_misconceptions,
+        }
+
+    return list(normalized.values())
 
 
 def _recency_factor(last_seen: datetime) -> float:

@@ -15,30 +15,23 @@ from app.utils.logger import logger
 class ExecutorAgent:
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    
-    def generate_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
-        """Generate a natural language mentor response based on context and strategy.
 
-        Args:
-            user_context: Aggregated identity and knowledge context.
-            current_message: The latest user input string.
-            strategy: Pedagogical controls (tone, verbosity, strategy type).
-
-        Returns:
-            A string containing the mentor's response, constrained by strategy.
-        """
-        # Get planner controls
+    def _build_response_prompt(
+        self,
+        user_context: Dict[str, Any],
+        current_message: str,
+        strategy: Dict[str, Any],
+    ) -> str:
+        """Build the shared mentor-response prompt for sync and streaming generation."""
         verbosity = strategy.get("verbosity", "normal")
         max_lines = strategy.get("max_lines", 6)
         pacing = strategy.get("pacing", "normal")
-        
-        # Adjust max lines based on verbosity
+
         if verbosity == "brief":
             max_lines = 8
         elif verbosity == "detailed":
             max_lines = 12
-        
-        # Phase 5.3 Custom Strategy Overlays
+
         strategy_overlay = ""
         current_strategy = strategy.get("strategy", "support")
         if current_strategy == "redirect":
@@ -50,7 +43,7 @@ class ExecutorAgent:
             correct_model = strategy.get("correct_model", "a different mental model")
             strategy_overlay = f"\nCRITICAL INSTRUCTION: You MUST use this template structure: 'I want to clear up something important. You mentioned {misconception}. Actually, {correct_model}. Here's why...'"
 
-        prompt = f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
+        return f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
 
 CONTEXT:
 {user_context.get('context_summary', 'A person on their growth journey.')}
@@ -77,6 +70,19 @@ STRICT RULES:
 7. One thoughtful question max if appropriate.
 
 Respond now (max {max_lines} lines):"""
+    
+    def generate_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
+        """Generate a natural language mentor response based on context and strategy.
+
+        Args:
+            user_context: Aggregated identity and knowledge context.
+            current_message: The latest user input string.
+            strategy: Pedagogical controls (tone, verbosity, strategy type).
+
+        Returns:
+            A string containing the mentor's response, constrained by strategy.
+        """
+        prompt = self._build_response_prompt(user_context, current_message, strategy)
 
         try:
             response = self.client.models.generate_content(
@@ -87,6 +93,27 @@ Respond now (max {max_lines} lines):"""
         except Exception as e:
             logger.error("Executor response error: %s", e)
             return "I'm with you. Tell me more about what's on your mind."
+
+    def generate_response_stream(
+        self,
+        user_context: Dict[str, Any],
+        current_message: str,
+        strategy: Dict[str, Any],
+    ):
+        """Yield raw model chunks for real-time WebSocket streaming."""
+        prompt = self._build_response_prompt(user_context, current_message, strategy)
+
+        try:
+            for chunk in self.client.models.generate_content_stream(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+            ):
+                text = getattr(chunk, "text", None)
+                if text:
+                    yield text
+        except Exception as e:
+            logger.error("Executor streaming error: %s", e)
+            raise
     
     def generate_voice_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
         """Generate a voice-optimized, ultra-concise response for text-to-speech.

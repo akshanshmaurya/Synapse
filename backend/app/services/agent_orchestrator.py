@@ -25,7 +25,7 @@ Both refer to the unique identifier for a single conversation.
 import asyncio
 import time
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable, Awaitable
 
 from app.agents.memory_agent import MemoryAgent
 from app.agents.planner_agent import PlannerAgent
@@ -65,377 +65,449 @@ class AgentOrchestrator:
 
         session_id == chat_id throughout — see module docstring.
         """
+        try:
+            prepared = await self._prepare_message_pipeline(
+                user_id=user_id,
+                message=message,
+                chat_id=chat_id,
+                session_goal=session_goal,
+            )
+            t0 = time.monotonic()
+            response = self.executor_agent.generate_response(
+                prepared["user_context"],
+                message,
+                prepared["strategy"],
+            )
+            prepared["step_timings"]["5_executor"] = _elapsed(t0)
+            return await self._finalize_message_pipeline(prepared, response)
+
+        except Exception as e:
+            logger.error("Orchestrator error: %s", e, exc_info=True)
+            return {
+                "response": "I sense something stirred in our conversation. Let's pause for a moment — share with me what you were thinking, and we'll find our way together.",
+                "chat_id": chat_id,
+            }
+
+    async def process_message_stream_async(
+        self,
+        user_id: str,
+        message: str,
+        on_token: Callable[[str], Awaitable[None]],
+        chat_id: Optional[str] = None,
+        session_goal: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run the full pipeline but stream executor chunks to a callback."""
+        prepared = await self._prepare_message_pipeline(
+            user_id=user_id,
+            message=message,
+            chat_id=chat_id,
+            session_goal=session_goal,
+        )
+
+        t0 = time.monotonic()
+        chunks = []
+        for chunk in self.executor_agent.generate_response_stream(
+            prepared["user_context"],
+            message,
+            prepared["strategy"],
+        ):
+            if not chunk:
+                continue
+            chunks.append(chunk)
+            await on_token(chunk)
+
+        response = "".join(chunks).strip()
+        if not response:
+            response = self.executor_agent.generate_response(
+                prepared["user_context"],
+                message,
+                prepared["strategy"],
+            )
+
+        prepared["step_timings"]["5_executor_stream"] = _elapsed(t0)
+        return await self._finalize_message_pipeline(prepared, response)
+
+    async def _prepare_message_pipeline(
+        self,
+        user_id: str,
+        message: str,
+        chat_id: Optional[str],
+        session_goal: Optional[str],
+    ) -> Dict[str, Any]:
+        """Prepare the synchronous pre-generation pipeline shared by HTTP and WS."""
         request_id = uuid.uuid4().hex[:8]
         pipeline_start = time.monotonic()
         step_timings: Dict[str, float] = {}
 
-        # Get or create chat session
         if not chat_id:
-            chat_id = await chat_service.get_or_create_active_chat(user_id)
+            chat_id = await chat_service.create_chat_session(user_id)
 
-        # use_v2 tracks whether three-layer context is available.
-        # If any new service fails, we fall back to legacy behavior.
         use_v2 = True
 
+        t0 = time.monotonic()
+        await chat_service.add_message(
+            chat_id=chat_id,
+            user_id=user_id,
+            sender=MessageSender.USER,
+            content=message,
+        )
+        step_timings["1_save_message"] = _elapsed(t0)
+
+        await trace_service.add_trace(
+            request_id=request_id,
+            agent="Persistence",
+            action="User Message Saved",
+            details={"chat_id": chat_id, "length": len(message)},
+            user_id=user_id,
+            session_id=chat_id,
+            input_summary=f"User sent a message ({len(message)} chars) to chat {chat_id}.",
+            decision="Persist user message to MongoDB before any processing.",
+            reasoning="Messages must be stored synchronously first so they are never lost, even if downstream agents fail.",
+            output_summary="User message written to chat collection.",
+        )
+
+        t0 = time.monotonic()
         try:
-            # ========== STEP 1: SAVE USER MESSAGE IMMEDIATELY ==========
-            t0 = time.monotonic()
-            await chat_service.add_message(
-                chat_id=chat_id,
-                user_id=user_id,
-                sender=MessageSender.USER,
-                content=message,
-            )
-            step_timings["1_save_message"] = _elapsed(t0)
-
-            await trace_service.add_trace(
-                request_id=request_id,
-                agent="Persistence",
-                action="User Message Saved",
-                details={"chat_id": chat_id, "length": len(message)},
-                user_id=user_id,
+            session_context = await session_context_service.get_or_create(
                 session_id=chat_id,
-                input_summary=f"User sent a message ({len(message)} chars) to chat {chat_id}.",
-                decision="Persist user message to MongoDB before any processing.",
-                reasoning="Messages must be stored synchronously first so they are never lost, even if downstream agents fail.",
-                output_summary="User message written to chat collection.",
+                user_id=user_id,
             )
+            if session_goal and use_v2:
+                await session_context_service.update_session_goal(
+                    session_id=chat_id,
+                    user_id=user_id,
+                    goal=session_goal,
+                )
+                logger.debug("Explicit session goal set: %r", session_goal)
+        except Exception as e:
+            logger.error("Session context load failed, falling back to legacy: %s", e)
+            session_context = None
+            use_v2 = False
+        step_timings["2_session_context"] = _elapsed(t0)
 
-            # ========== STEP 2: LOAD/CREATE SESSION CONTEXT (NEW) ==========
-            t0 = time.monotonic()
+        t0 = time.monotonic()
+        recent_msgs = await chat_service.get_context_window(chat_id, n=10)
+        recent_user_messages = [
+            m["content"] for m in recent_msgs if m.get("sender") == "user"
+        ][-5:]
+        step_timings["2.5_fetch_context"] = _elapsed(t0)
+
+        t0 = time.monotonic()
+        if use_v2 and session_context:
+            if intent_classifier_service.should_reclassify(session_context, message):
+                intent_result = intent_classifier_service.classify(
+                    message=message,
+                    message_count=session_context.message_count + 1,
+                    session_history=recent_user_messages,
+                )
+                session_context.session_intent = intent_result.intent
+                session_context.intent_classified_at_message = session_context.message_count
+        step_timings["3_intent"] = _elapsed(t0)
+
+        t0 = time.monotonic()
+        if use_v2 and session_context:
+            if goal_inference_service.should_infer(session_context):
+                inference_result = goal_inference_service.infer_goal(
+                    session_history=recent_user_messages,
+                    session_domain=session_context.session_domain,
+                )
+                if inference_result.confidence >= 0.5:
+                    session_context.session_goal = inference_result.inferred_goal
+                    session_context.session_domain = inference_result.inferred_domain
+                    session_context.goal_inferred = True
+                    session_context.goal_confirmed = False
+        step_timings["4_goal_inference"] = _elapsed(t0)
+
+        t0 = time.monotonic()
+        if use_v2:
             try:
-                session_context = await session_context_service.get_or_create(
-                    session_id=chat_id,  # session_id == chat_id
+                user_context = await self.memory_agent.retrieve_context(
                     user_id=user_id,
+                    session_id=chat_id,
+                    message=message,
                 )
-
-                # If the caller explicitly set a session goal, persist it now.
-                # This takes priority over any goal the planner might infer later.
-                if session_goal and use_v2:
-                    await session_context_service.update_session_goal(
-                        session_id=chat_id,
-                        user_id=user_id,
-                        goal=session_goal,
-                    )
-                    logger.debug("Explicit session goal set: %r", session_goal)
-
+                user_context["_session_id"] = chat_id
+                user_context["_user_id"] = user_id
             except Exception as e:
-                logger.error("Session context load failed, falling back to legacy: %s", e)
-                session_context = None
+                logger.error(
+                    "Three-layer context assembly failed, falling back to legacy: %s",
+                    e,
+                )
                 use_v2 = False
-            step_timings["2_session_context"] = _elapsed(t0)
 
-            # ========== STEP 2.5: RECENT MESSAGES ==========
-            t0 = time.monotonic()
-            recent_msgs = await chat_service.get_context_window(chat_id, n=10)
-            recent_user_messages = [m["content"] for m in recent_msgs if m.get("sender") == "user"][-5:]
-            step_timings["2.5_fetch_context"] = _elapsed(t0)
-            
-            # ========== STEP 3: INTENT CLASSIFICATION ==========
-            t0 = time.monotonic()
-            if use_v2 and session_context:
-                if intent_classifier_service.should_reclassify(session_context, message):
-                    intent_result = intent_classifier_service.classify(
-                        message=message,
-                        message_count=session_context.message_count + 1,
-                        session_history=recent_user_messages
-                    )
-                    session_context.session_intent = intent_result.intent
-                    session_context.intent_classified_at_message = session_context.message_count
-            step_timings["3_intent"] = _elapsed(t0)
+        if not use_v2:
+            user_context = await self.memory_agent.get_user_context(user_id)
+            recent_context = await chat_service.format_context_for_llm(chat_id, n=5)
+            user_context["recent_chat"] = recent_context
 
-            # ========== STEP 4: GOAL INFERENCE ==========
-            t0 = time.monotonic()
-            if use_v2 and session_context:
-                if goal_inference_service.should_infer(session_context):
-                    inference_result = goal_inference_service.infer_goal(
-                        session_history=recent_user_messages,
-                        session_domain=session_context.session_domain
-                    )
-                    if inference_result.confidence >= 0.5:
-                        session_context.session_goal = inference_result.inferred_goal
-                        session_context.session_domain = inference_result.inferred_domain
-                        session_context.goal_inferred = True
-                        session_context.goal_confirmed = False
-            step_timings["4_goal_inference"] = _elapsed(t0)
+        step_timings["3_memory_assembly"] = _elapsed(t0)
 
-            # ========== STEP 3: ASSEMBLE MEMORY FROM 3 LAYERS ==========
-            t0 = time.monotonic()
-            if use_v2:
-                try:
-                    user_context = await self.memory_agent.retrieve_context(
-                        user_id=user_id,
-                        session_id=chat_id,
-                        message=message,
-                    )
-                    # Inject identifiers for downstream use (planner needs these)
-                    user_context["_session_id"] = chat_id
-                    user_context["_user_id"] = user_id
-                except Exception as e:
-                    logger.error("Three-layer context assembly failed, falling back to legacy: %s", e)
-                    use_v2 = False
-
-            if not use_v2:
-                # Legacy fallback — load from flat UserMemory
-                user_context = await self.memory_agent.get_user_context(user_id)
-                recent_context = await chat_service.format_context_for_llm(chat_id, n=5)
-                user_context["recent_chat"] = recent_context
-
-            step_timings["3_memory_assembly"] = _elapsed(t0)
-
-            # Trace: summarise context for observability
-            if use_v2:
-                session_summary = user_context.get("session", {})
-                profile_summary = user_context.get("profile", {})
-                timing_info = user_context.get("_timing", {})
-                missing = user_context.get("_missing", [])
-
-                await trace_service.add_trace(
-                    request_id=request_id,
-                    agent="Memory",
-                    action="Context Assembled (v2)",
-                    details={
-                        "layers": "profile+session+concepts",
-                        "timing": timing_info,
-                        "missing": missing,
-                    },
-                    user_id=user_id,
-                    session_id=chat_id,
-                    input_summary=(
-                        f"Assembled three-layer context for user '{user_id}', session '{chat_id}'."
-                    ),
-                    decision="Fetch profile, session, concept memory, and recent messages in parallel.",
-                    reasoning=(
-                        f"Session momentum: '{session_summary.get('session_momentum', 'cold_start')}'. "
-                        f"Session clarity: {session_summary.get('session_clarity', 50.0)}/100. "
-                        f"Experience: '{profile_summary.get('experience_level', 'beginner')}'. "
-                        f"Missing layers: {missing or 'none'}."
-                    ),
-                    output_summary=(
-                        f"Context assembled in {timing_info.get('total_ms', '?')}ms. "
-                        f"Active concepts: {session_summary.get('active_concepts', [])}."
-                    ),
-                )
-            else:
-                # Legacy trace
-                profile = user_context.get("profile", {})
-                struggles = user_context.get("struggles", [])
-                eval_history = user_context.get("progress", {}).get("evaluation_history", [])
-                last_clarity = eval_history[-1].get("clarity_score", None) if eval_history else None
-
-                await trace_service.add_trace(
-                    request_id=request_id,
-                    agent="Memory",
-                    action="Context Fetched (legacy)",
-                    details={"profile": "Loaded", "fallback": True},
-                    user_id=user_id,
-                    session_id=chat_id,
-                    input_summary=f"Legacy context fetch for user '{user_id}'.",
-                    decision="Fell back to flat UserMemory due to v2 service failure.",
-                    reasoning=(
-                        f"User has {len(struggles)} struggle(s). "
-                        f"Last clarity: {last_clarity if last_clarity is not None else 'N/A'}."
-                    ),
-                    output_summary=(
-                        f"Legacy context — stage: '{profile.get('stage', 'unknown')}', "
-                        f"pace: '{profile.get('learning_pace', 'moderate')}'."
-                    ),
-                )
-
-            # Check message count for first-message detection
-            msg_count = await chat_service.get_message_count(chat_id)
-            is_first_message = msg_count <= 1
-
-            # ========== STEP 4: PLANNER (STRATEGY) ==========
-            t0 = time.monotonic()
-            if use_v2:
-                strategy = await self.planner_agent.plan_response_v2(user_context, message)
-            else:
-                strategy = self.planner_agent.plan_response(user_context, message)
-            step_timings["4_planner"] = _elapsed(t0)
-
-            # Build trace reasoning
-            if use_v2:
-                session_info = user_context.get("session", {})
-                override_info = strategy.get("_override_applied", "none")
-
-                await trace_service.add_trace(
-                    request_id=request_id,
-                    agent="Planner",
-                    action="Strategy Decided (v2)",
-                    details={
-                        "strategy": strategy.get("strategy"),
-                        "tone": strategy.get("tone"),
-                        "pacing": strategy.get("pacing"),
-                        "focus_concepts": strategy.get("focus_concepts", []),
-                        "should_assess": strategy.get("should_assess"),
-                        "goal_inference": strategy.get("session_goal_inference"),
-                        "override": override_info,
-                    },
-                    user_id=user_id,
-                    session_id=chat_id,
-                    input_summary=(
-                        f"Message: \"{message[:120]}{'...' if len(message) > 120 else ''}\". "
-                        f"Momentum='{session_info.get('session_momentum', 'cold_start')}', "
-                        f"clarity={session_info.get('session_clarity', 50.0)}/100."
-                    ),
-                    decision=(
-                        f"strategy='{strategy.get('strategy')}', "
-                        f"tone='{strategy.get('tone')}', "
-                        f"pacing='{strategy.get('pacing')}', "
-                        f"focus_concepts={strategy.get('focus_concepts', [])}."
-                    ),
-                    reasoning=(
-                        f"Override: {override_info}. "
-                        f"Detected emotion: '{strategy.get('detected_emotion', 'neutral')}'. "
-                        f"Goal inference: '{strategy.get('session_goal_inference') or 'none'}'."
-                    ),
-                    output_summary=(
-                        f"Plan: '{strategy.get('strategy')}' strategy, "
-                        f"'{strategy.get('tone')}' tone, "
-                        f"max {strategy.get('max_lines', 6)} lines."
-                    ),
-                )
-            else:
-                # Legacy planner trace
-                eval_history = user_context.get("progress", {}).get("evaluation_history", [])
-                recent_clarity_val = eval_history[-1].get("clarity_score", 50) if eval_history else 50
-                confusion_trend = eval_history[-1].get("confusion_trend", "stable") if eval_history else "stable"
-
-                await trace_service.add_trace(
-                    request_id=request_id,
-                    agent="Planner",
-                    action="Strategy Decided (legacy)",
-                    details={
-                        "strategy": strategy.get("strategy"),
-                        "tone": strategy.get("tone"),
-                        "pacing": strategy.get("pacing"),
-                    },
-                    user_id=user_id,
-                    session_id=chat_id,
-                    input_summary=f"Message: \"{message[:120]}\". Clarity={recent_clarity_val}/100.",
-                    decision=f"strategy='{strategy.get('strategy')}', tone='{strategy.get('tone')}'.",
-                    reasoning=f"Trend={confusion_trend}. Focus: {strategy.get('focus_areas', [])}.",
-                    output_summary=f"Plan: '{strategy.get('strategy')}', max {strategy.get('max_lines', 6)} lines.",
-                )
-
-            # ========== STEP 5: EXECUTOR (GENERATE RESPONSE) ==========
-            t0 = time.monotonic()
-            response = self.executor_agent.generate_response(user_context, message, strategy)
-            step_timings["5_executor"] = _elapsed(t0)
-
-            response_line_count = len([ln for ln in response.split("\n") if ln.strip()])
+        if use_v2:
+            session_summary = user_context.get("session", {})
+            profile_summary = user_context.get("profile", {})
+            timing_info = user_context.get("_timing", {})
+            missing = user_context.get("_missing", [])
 
             await trace_service.add_trace(
                 request_id=request_id,
-                agent="Executor",
-                action="Response Generated",
+                agent="Memory",
+                action="Context Assembled (v2)",
                 details={
-                    "line_count": response_line_count,
-                    "char_count": len(response),
+                    "layers": "profile+session+concepts",
+                    "timing": timing_info,
+                    "missing": missing,
                 },
                 user_id=user_id,
                 session_id=chat_id,
                 input_summary=(
-                    f"Strategy: '{strategy.get('strategy')}', "
-                    f"tone='{strategy.get('tone')}', "
-                    f"verbosity='{strategy.get('verbosity')}'."
+                    f"Assembled three-layer context for user '{user_id}', session '{chat_id}'."
                 ),
-                decision=f"Generate '{strategy.get('verbosity', 'normal')}' response.",
-                reasoning=f"Pacing='{strategy.get('pacing')}', emotion='{strategy.get('detected_emotion', 'neutral')}'.",
+                decision="Fetch profile, session, concept memory, and recent messages in parallel.",
+                reasoning=(
+                    f"Session momentum: '{session_summary.get('session_momentum', 'cold_start')}'. "
+                    f"Session clarity: {session_summary.get('session_clarity', 50.0)}/100. "
+                    f"Experience: '{profile_summary.get('experience_level', 'beginner')}'. "
+                    f"Missing layers: {missing or 'none'}."
+                ),
                 output_summary=(
-                    f"{response_line_count} lines, {len(response)} chars. "
-                    f"Preview: \"{response[:100].replace(chr(10), ' ')}{'...' if len(response) > 100 else ''}\""
+                    f"Context assembled in {timing_info.get('total_ms', '?')}ms. "
+                    f"Active concepts: {session_summary.get('active_concepts', [])}."
                 ),
             )
-
-            # ========== STEP 6: SAVE MENTOR RESPONSE IMMEDIATELY ==========
-            t0 = time.monotonic()
-            await chat_service.add_message(
-                chat_id=chat_id,
-                user_id=user_id,
-                sender=MessageSender.MENTOR,
-                content=response,
-                metadata={"planner_strategy": strategy},
-            )
-            step_timings["6_save_response"] = _elapsed(t0)
+        else:
+            profile = user_context.get("profile", {})
+            struggles = user_context.get("struggles", [])
+            eval_history = user_context.get("progress", {}).get("evaluation_history", [])
+            last_clarity = eval_history[-1].get("clarity_score", None) if eval_history else None
 
             await trace_service.add_trace(
                 request_id=request_id,
-                agent="Persistence",
-                action="Mentor Response Saved",
-                details={"chat_id": chat_id, "sync": True},
+                agent="Memory",
+                action="Context Fetched (legacy)",
+                details={"profile": "Loaded", "fallback": True},
                 user_id=user_id,
                 session_id=chat_id,
-                input_summary=f"Executor response ({len(response)} chars) ready to persist.",
-                decision="Write mentor response to chat collection synchronously.",
-                reasoning="Response must be stored before returning to the client so history is consistent.",
-                output_summary=f"Mentor message persisted to chat {chat_id}.",
+                input_summary=f"Legacy context fetch for user '{user_id}'.",
+                decision="Fell back to flat UserMemory due to v2 service failure.",
+                reasoning=(
+                    f"User has {len(struggles)} struggle(s). "
+                    f"Last clarity: {last_clarity if last_clarity is not None else 'N/A'}."
+                ),
+                output_summary=(
+                    f"Legacy context — stage: '{profile.get('stage', 'unknown')}', "
+                    f"pace: '{profile.get('learning_pace', 'moderate')}'."
+                ),
             )
 
-            # ========== STEP 7: INCREMENT SESSION MESSAGE COUNT (NEW) ==========
-            if use_v2:
-                t0 = time.monotonic()
-                try:
-                    await session_context_service.increment_message_count(
-                        session_id=chat_id
-                    )
-                except Exception as e:
-                    logger.warning("Failed to increment session message count: %s", e)
-                step_timings["7_session_increment"] = _elapsed(t0)
+        msg_count = await chat_service.get_message_count(chat_id)
+        is_first_message = msg_count <= 1
 
-            # ========== STEP 8: UPDATE CHAT TITLE (first message only) ==========
-            if is_first_message:
-                chat_intent = strategy.get("chat_intent", "")
-                chat_title = self._generate_chat_title(message, chat_intent)
-                await chat_service.update_chat_title(chat_id, chat_title)
+        t0 = time.monotonic()
+        if use_v2:
+            strategy = await self.planner_agent.plan_response_v2(user_context, message)
+        else:
+            strategy = self.planner_agent.plan_response(user_context, message)
+        step_timings["4_planner"] = _elapsed(t0)
 
-            # ========== STEP 9: PREPARE RESULT ==========
-            evaluation_data = None
-            session_context_data = None
+        if use_v2:
+            session_info = user_context.get("session", {})
+            override_info = strategy.get("_override_applied", "none")
 
-            if use_v2:
-                # Use session clarity from the assembled context
-                session_info = user_context.get("session", {})
-                evaluation_data = {
-                    "clarity_score": session_info.get("session_clarity", 50.0),
-                    "understanding_delta": 0,
-                    "confusion_trend": "stable",
-                    "engagement_level": "medium",
-                }
-                # Session context snapshot for the frontend
-                session_context_data = {
-                    "goal": session_info.get("session_goal"),
-                    "momentum": session_info.get("session_momentum", "cold_start"),
-                    "active_concepts": session_info.get("active_concepts", []),
-                    "message_count": session_info.get("message_count", 0),
-                }
-            else:
-                prev_evaluations = user_context.get("progress", {}).get("evaluation_history", [])
-                if prev_evaluations:
-                    latest_eval = prev_evaluations[-1]
-                    evaluation_data = {
-                        "clarity_score": latest_eval.get("clarity_score", 0),
-                        "understanding_delta": latest_eval.get("understanding_delta", 0),
-                        "confusion_trend": latest_eval.get("confusion_trend", "stable"),
-                        "engagement_level": latest_eval.get("engagement_level", "medium"),
-                    }
+            await trace_service.add_trace(
+                request_id=request_id,
+                agent="Planner",
+                action="Strategy Decided (v2)",
+                details={
+                    "strategy": strategy.get("strategy"),
+                    "tone": strategy.get("tone"),
+                    "pacing": strategy.get("pacing"),
+                    "focus_concepts": strategy.get("focus_concepts", []),
+                    "should_assess": strategy.get("should_assess"),
+                    "goal_inference": strategy.get("session_goal_inference"),
+                    "override": override_info,
+                },
+                user_id=user_id,
+                session_id=chat_id,
+                input_summary=(
+                    f"Message: \"{message[:120]}{'...' if len(message) > 120 else ''}\". "
+                    f"Momentum='{session_info.get('session_momentum', 'cold_start')}', "
+                    f"clarity={session_info.get('session_clarity', 50.0)}/100."
+                ),
+                decision=(
+                    f"strategy='{strategy.get('strategy')}', "
+                    f"tone='{strategy.get('tone')}', "
+                    f"pacing='{strategy.get('pacing')}', "
+                    f"focus_concepts={strategy.get('focus_concepts', [])}."
+                ),
+                reasoning=(
+                    f"Override: {override_info}. "
+                    f"Detected emotion: '{strategy.get('detected_emotion', 'neutral')}'. "
+                    f"Goal inference: '{strategy.get('session_goal_inference') or 'none'}'."
+                ),
+                output_summary=(
+                    f"Plan: '{strategy.get('strategy')}' strategy, "
+                    f"'{strategy.get('tone')}' tone, "
+                    f"max {strategy.get('max_lines', 6)} lines."
+                ),
+            )
+        else:
+            eval_history = user_context.get("progress", {}).get("evaluation_history", [])
+            recent_clarity_val = eval_history[-1].get("clarity_score", 50) if eval_history else 50
+            confusion_trend = eval_history[-1].get("confusion_trend", "stable") if eval_history else "stable"
 
-            result = {
-                "response": response,
-                "chat_id": chat_id,
-                "evaluation": evaluation_data,
-                "session_context": session_context_data,  # None when v2 unavailable
+            await trace_service.add_trace(
+                request_id=request_id,
+                agent="Planner",
+                action="Strategy Decided (legacy)",
+                details={
+                    "strategy": strategy.get("strategy"),
+                    "tone": strategy.get("tone"),
+                    "pacing": strategy.get("pacing"),
+                },
+                user_id=user_id,
+                session_id=chat_id,
+                input_summary=f"Message: \"{message[:120]}\". Clarity={recent_clarity_val}/100.",
+                decision=f"strategy='{strategy.get('strategy')}', tone='{strategy.get('tone')}'.",
+                reasoning=f"Trend={confusion_trend}. Focus: {strategy.get('focus_areas', [])}.",
+                output_summary=f"Plan: '{strategy.get('strategy')}', max {strategy.get('max_lines', 6)} lines.",
+            )
+
+        return {
+            "request_id": request_id,
+            "pipeline_start": pipeline_start,
+            "step_timings": step_timings,
+            "chat_id": chat_id,
+            "use_v2": use_v2,
+            "session_context": session_context,
+            "recent_user_messages": recent_user_messages,
+            "user_context": user_context,
+            "strategy": strategy,
+            "message": message,
+            "user_id": user_id,
+            "is_first_message": is_first_message,
+        }
+
+    async def _finalize_message_pipeline(
+        self,
+        prepared: Dict[str, Any],
+        response: str,
+    ) -> Dict[str, Any]:
+        """Persist the generated response, prepare the API payload, and schedule background work."""
+        request_id = prepared["request_id"]
+        chat_id = prepared["chat_id"]
+        user_id = prepared["user_id"]
+        message = prepared["message"]
+        user_context = prepared["user_context"]
+        strategy = prepared["strategy"]
+        use_v2 = prepared["use_v2"]
+        session_context = prepared["session_context"]
+        recent_user_messages = prepared["recent_user_messages"]
+        step_timings = prepared["step_timings"]
+        pipeline_start = prepared["pipeline_start"]
+        is_first_message = prepared["is_first_message"]
+
+        response_line_count = len([ln for ln in response.split("\n") if ln.strip()])
+
+        await trace_service.add_trace(
+            request_id=request_id,
+            agent="Executor",
+            action="Response Generated",
+            details={
+                "line_count": response_line_count,
+                "char_count": len(response),
+            },
+            user_id=user_id,
+            session_id=chat_id,
+            input_summary=(
+                f"Strategy: '{strategy.get('strategy')}', "
+                f"tone='{strategy.get('tone')}', "
+                f"verbosity='{strategy.get('verbosity')}'."
+            ),
+            decision=f"Generate '{strategy.get('verbosity', 'normal')}' response.",
+            reasoning=f"Pacing='{strategy.get('pacing')}', emotion='{strategy.get('detected_emotion', 'neutral')}'.",
+            output_summary=(
+                f"{response_line_count} lines, {len(response)} chars. "
+                f"Preview: \"{response[:100].replace(chr(10), ' ')}{'...' if len(response) > 100 else ''}\""
+            ),
+        )
+
+        t0 = time.monotonic()
+        await chat_service.add_message(
+            chat_id=chat_id,
+            user_id=user_id,
+            sender=MessageSender.MENTOR,
+            content=response,
+            metadata={"planner_strategy": strategy},
+        )
+        step_timings["6_save_response"] = _elapsed(t0)
+
+        await trace_service.add_trace(
+            request_id=request_id,
+            agent="Persistence",
+            action="Mentor Response Saved",
+            details={"chat_id": chat_id, "sync": True},
+            user_id=user_id,
+            session_id=chat_id,
+            input_summary=f"Executor response ({len(response)} chars) ready to persist.",
+            decision="Write mentor response to chat collection synchronously.",
+            reasoning="Response must be stored before returning to the client so history is consistent.",
+            output_summary=f"Mentor message persisted to chat {chat_id}.",
+        )
+
+        if use_v2:
+            t0 = time.monotonic()
+            try:
+                await session_context_service.increment_message_count(session_id=chat_id)
+            except Exception as e:
+                logger.warning("Failed to increment session message count: %s", e)
+            step_timings["7_session_increment"] = _elapsed(t0)
+
+        if is_first_message:
+            chat_intent = strategy.get("chat_intent", "")
+            chat_title = self._generate_chat_title(message, chat_intent)
+            await chat_service.update_chat_title(chat_id, chat_title)
+
+        evaluation_data = None
+        session_context_data = None
+
+        if use_v2:
+            session_info = user_context.get("session", {})
+            evaluation_data = {
+                "clarity_score": session_info.get("session_clarity", 50.0),
+                "understanding_delta": 0,
+                "confusion_trend": "stable",
+                "engagement_level": "medium",
             }
+            session_context_data = {
+                "goal": session_info.get("session_goal"),
+                "momentum": session_info.get("session_momentum", "cold_start"),
+                "active_concepts": session_info.get("active_concepts", []),
+                "message_count": session_info.get("message_count", 0),
+            }
+        else:
+            prev_evaluations = user_context.get("progress", {}).get("evaluation_history", [])
+            if prev_evaluations:
+                latest_eval = prev_evaluations[-1]
+                evaluation_data = {
+                    "clarity_score": latest_eval.get("clarity_score", 0),
+                    "understanding_delta": latest_eval.get("understanding_delta", 0),
+                    "confusion_trend": latest_eval.get("confusion_trend", "stable"),
+                    "engagement_level": latest_eval.get("engagement_level", "medium"),
+                }
 
-            # ========== STEP 10: ASYNC BACKGROUND TASKS ==========
-            step_timings["total_sync_ms"] = round((time.monotonic() - pipeline_start) * 1000, 1)
-            logger.info(
-                "Pipeline sync complete [%s]: %s", request_id, step_timings
-            )
+        result = {
+            "response": response,
+            "chat_id": chat_id,
+            "evaluation": evaluation_data,
+            "session_context": session_context_data,
+        }
 
-            if use_v2:
-                task = asyncio.create_task(self._run_background_tasks_v2(
+        step_timings["total_sync_ms"] = round((time.monotonic() - pipeline_start) * 1000, 1)
+        logger.info("Pipeline sync complete [%s]: %s", request_id, step_timings)
+
+        if use_v2:
+            task = asyncio.create_task(
+                self._run_background_tasks_v2(
                     user_id=user_id,
                     message=message,
                     response=response,
@@ -444,10 +516,12 @@ class AgentOrchestrator:
                     request_id=request_id,
                     chat_id=chat_id,
                     session_context=session_context,
-                    session_history=recent_user_messages
-                ))
-            else:
-                task = asyncio.create_task(self._run_background_tasks(
+                    session_history=recent_user_messages,
+                )
+            )
+        else:
+            task = asyncio.create_task(
+                self._run_background_tasks(
                     user_id=user_id,
                     message=message,
                     response=response,
@@ -455,19 +529,13 @@ class AgentOrchestrator:
                     strategy=strategy,
                     request_id=request_id,
                     chat_id=chat_id,
-                ))
+                )
+            )
 
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
-            return result
-
-        except Exception as e:
-            logger.error("Orchestrator error: %s", e, exc_info=True)
-            return {
-                "response": "I sense something stirred in our conversation. Let's pause for a moment — share with me what you were thinking, and we'll find our way together.",
-                "chat_id": chat_id,
-            }
+        return result
 
     # =========================================================================
     # NEW: Background tasks using three-layer memory

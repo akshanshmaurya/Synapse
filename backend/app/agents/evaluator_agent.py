@@ -12,7 +12,11 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from app.core.config import settings
 from app.services.session_context_service import session_context_service
-from app.services.concept_memory_service import concept_memory_service, slugify_concept
+from app.services.concept_memory_service import (
+    concept_memory_service,
+    slugify_concept,
+    normalize_extracted_concepts,
+)
 from app.services.llm_utils import strip_json_fences
 from app.knowledge.prerequisite_graph import is_in_zpd, get_prerequisites
 from app.utils.logger import logger
@@ -264,6 +268,34 @@ RESPOND ONLY WITH VALID JSON."""
         if not isinstance(result.get("misconceptions_detected"), dict):
             result["misconceptions_detected"] = {}
 
+        normalized_concepts = normalize_extracted_concepts(
+            concepts=result.get("concepts_discussed", []),
+            concept_clarity=result.get("concept_clarity", {}),
+            misconceptions=result.get("misconceptions_detected", {}),
+            session_domain=session.get("session_domain"),
+        )
+        if normalized_concepts:
+            result["concepts_discussed"] = [
+                item["concept_name"] for item in normalized_concepts
+            ]
+            result["concept_clarity"] = {
+                item["concept_name"]: (
+                    item["clarity_score"]
+                    if item["clarity_score"] > 0
+                    else result.get("clarity_score", 50.0)
+                )
+                for item in normalized_concepts
+            }
+            result["misconceptions_detected"] = {
+                item["concept_name"]: item["misconceptions"]
+                for item in normalized_concepts
+                if item["misconceptions"]
+            }
+        else:
+            result["concepts_discussed"] = []
+            result["concept_clarity"] = {}
+            result["misconceptions_detected"] = {}
+
         # --- ZPD Alignment Check ---
         # This checks if the conversation is teaching in the user's ZPD
         # Uses the prerequisite graph — no LLM involved
@@ -360,8 +392,14 @@ RESPOND ONLY WITH VALID JSON."""
         concepts = evaluation.get("concepts_discussed", [])
         concept_clarity = evaluation.get("concept_clarity", {})
         misconceptions = evaluation.get("misconceptions_detected", {})
+        normalized_concepts = normalize_extracted_concepts(
+            concepts=concepts,
+            concept_clarity=concept_clarity,
+            misconceptions=misconceptions,
+            session_domain=session_domain,
+        )
 
-        if not concepts:
+        if not normalized_concepts:
             logger.debug(
                 "Evaluator: no concepts extracted for session=%s, skipping concept memory update",
                 session_id,
@@ -371,36 +409,20 @@ RESPOND ONLY WITH VALID JSON."""
         try:
             t0 = time.monotonic()
             concept_ids = []
-            domain = session_domain or "general"
 
-            for concept_name in concepts:
-                if not isinstance(concept_name, str) or not concept_name.strip():
-                    continue
-
-                concept_id = slugify_concept(concept_name)
+            for concept in normalized_concepts:
+                concept_id = concept["concept_id"]
+                concept_name = concept["concept_name"]
                 concept_ids.append(concept_id)
 
-                clarity = concept_clarity.get(
-                    concept_name, evaluation.get("clarity_score", 50.0)
-                )
-                # Ensure clarity is numeric
-                if not isinstance(clarity, (int, float)):
-                    clarity = evaluation.get("clarity_score", 50.0)
-
-                miscons_raw = misconceptions.get(concept_name, [])
-                # Normalize: could be a string or a list
-                if isinstance(miscons_raw, str):
-                    miscons = [miscons_raw] if miscons_raw else []
-                elif isinstance(miscons_raw, list):
-                    miscons = [m for m in miscons_raw if isinstance(m, str) and m]
-                else:
-                    miscons = []
+                clarity = concept.get("clarity_score") or evaluation.get("clarity_score", 50.0)
+                miscons = concept.get("misconceptions", [])
 
                 await concept_memory_service.update_concept(
                     user_id=user_id,
                     concept_id=concept_id,
                     concept_name=concept_name,
-                    domain=domain,
+                    domain=concept.get("domain", session_domain or "general"),
                     clarity_score=clarity,
                     session_id=session_id,
                     misconceptions=miscons,
