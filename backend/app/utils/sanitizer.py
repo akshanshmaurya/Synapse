@@ -16,5 +16,6 @@ def sanitize_text(text: str) -> str:
     """
     if not text:
         return text
-    # Strip all tags, attributes, and styles
-    return bleach.clean(text, tags=[], attributes={}, styles=[], strip=True)
+    # Strip all tags and attributes. Newer bleach versions removed the
+    # dedicated `styles` kwarg, so keeping the allowlists empty is enough.
+    return bleach.clean(text, tags=[], attributes={}, strip=True)

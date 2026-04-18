@@ -4,11 +4,10 @@ Provides real-time streaming chat via WebSocket with HTTP fallback.
 Authentication via cookie-based JWT tokens.
 """
 import json
-import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from app.auth.jwt_handler import verify_token
 from app.services.agent_orchestrator import AgentOrchestrator
-from app.services.chat_service import chat_service
+from app.utils.sanitizer import sanitize_text
 from app.utils.logger import logger
 
 router = APIRouter()
@@ -69,29 +68,24 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
             await websocket.send_json({"type": "typing", "content": ""})
 
             try:
-                # Process through the agent pipeline
+                sanitized_message = sanitize_text(message)
                 chat_id = session_id if session_id != "new" else None
-                result = await orchestrator.process_message_async(
+
+                async def _send_token(chunk: str):
+                    await websocket.send_json({
+                        "type": "token",
+                        "content": chunk,
+                    })
+
+                result = await orchestrator.process_message_stream_async(
                     user_id=user_id,
-                    message=message,
+                    message=sanitized_message,
+                    on_token=_send_token,
                     chat_id=chat_id,
                 )
 
                 response_text = result.get("response", "")
                 final_chat_id = result.get("chat_id", session_id)
-
-                # Stream response in chunks for real-time feel
-                words = response_text.split(" ")
-                chunk_size = 3  # Send 3 words at a time
-                streamed = []
-                for i in range(0, len(words), chunk_size):
-                    chunk = " ".join(words[i:i + chunk_size])
-                    streamed.append(chunk)
-                    await websocket.send_json({
-                        "type": "token",
-                        "content": chunk,
-                    })
-                    await asyncio.sleep(0.05)  # 50ms between chunks
 
                 # Send final complete message
                 await websocket.send_json({

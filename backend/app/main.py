@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
+from typing import Optional
 from contextlib import asynccontextmanager
 import uuid
 
@@ -146,7 +147,7 @@ class EvaluationData(BaseModel):
 
 class SessionContextData(BaseModel):
     """Lightweight session state for frontend session-aware UI."""
-    goal: str = None
+    goal: Optional[str] = None
     momentum: str = "cold_start"
     active_concepts: list = []
     message_count: int = 0

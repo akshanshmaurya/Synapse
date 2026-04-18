@@ -50,7 +50,9 @@ class ChatService:
         """
         chats = get_chats_collection()
         
-        cursor = chats.find({"user_id": user_id}).sort(
+        cursor = chats.find(
+            {"user_id": user_id, "message_count": {"$gt": 0}}
+        ).sort(
             "updated_at", -1
         ).skip(offset).limit(limit)
         

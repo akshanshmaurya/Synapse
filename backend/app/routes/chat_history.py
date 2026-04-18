@@ -8,7 +8,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
-from app.core.authorization import require_admin
 from app.services.chat_service import chat_service
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -123,7 +122,7 @@ async def update_chat(
 @router.delete("/{chat_id}")
 async def delete_chat_session(
     chat_id: str,
-    user: dict = Depends(require_admin)
+    user: dict = Depends(get_current_user)
 ):
     """Delete a chat session and all its messages."""
     user_id = str(user["_id"])  # Convert ObjectId to string
