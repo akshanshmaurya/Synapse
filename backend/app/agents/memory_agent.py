@@ -150,24 +150,76 @@ class MemoryAgent:
     def _build_context_summary(profile: dict, session: dict, concepts: dict) -> str:
         """
         Rule-based context summary for agent prompts. No LLM calls.
+
+        Produces a multi-sentence structured summary covering identity,
+        session state, concept mastery, and known challenges. This summary
+        is one section of the Executor's prompt — not the entire context.
         """
         experience = profile.get("experience_level", "beginner")
+        learning_style = profile.get("preferred_learning_style", "mixed")
+        mentoring_tone = profile.get("mentoring_tone", "balanced")
         interests = profile.get("career_interests", [])
         interests_str = ", ".join(interests) if interests else "not specified"
+        strengths = profile.get("strengths_summary", [])
+        weaknesses = profile.get("weaknesses_summary", [])
 
         goal = session.get("session_goal") or "not yet specified"
         momentum = session.get("session_momentum", "cold_start")
         clarity = session.get("session_clarity", 50.0)
+        confusion_points = session.get("session_confusion_points", [])
+        msg_count = session.get("message_count", 0)
 
-        active_ids = list(concepts.get("active", {}).keys())
+        active = concepts.get("active", {})
+        active_ids = list(active.keys())
         active_str = ", ".join(active_ids) if active_ids else "none yet"
+        avg_mastery = concepts.get("overall_mastery_average", 0.0)
+        related_weak = concepts.get("related_weak", [])
 
-        return (
-            f"User is a {experience} learner interested in {interests_str}. "
-            f"In this session, they're working on: {goal}. "
-            f"Session momentum: {momentum}. Current clarity: {clarity}/100. "
-            f"Active concepts: {active_str}."
+        # Build multi-sentence summary
+        lines = []
+
+        # Identity
+        lines.append(
+            f"This learner is at the {experience} level, prefers {learning_style} learning, "
+            f"and responds best to a {mentoring_tone} communication style. "
+            f"Their areas of interest: {interests_str}."
         )
+
+        # Strengths/weaknesses
+        if strengths:
+            lines.append(f"Known strengths: {', '.join(strengths[:3])}.")
+        if weaknesses:
+            lines.append(f"Known weaknesses: {', '.join(weaknesses[:3])}.")
+
+        # Session state
+        lines.append(
+            f"Session goal: {goal}. "
+            f"Momentum: {momentum}. Clarity: {clarity:.0f}/100. "
+            f"Messages in session: {msg_count}."
+        )
+
+        # Concept mastery
+        if active_ids:
+            mastery_parts = []
+            for cid, info in active.items():
+                m = info.get("mastery", 0.0)
+                mastery_parts.append(f"{cid} ({m:.0%})")
+            lines.append(f"Active concepts with mastery: {', '.join(mastery_parts)}.")
+            if avg_mastery > 0:
+                lines.append(f"Overall mastery average: {avg_mastery:.0%}.")
+        else:
+            lines.append("No concepts tracked yet in this session.")
+
+        # Weak related concepts
+        if related_weak:
+            weak_names = [rw.get("concept_name", "?") for rw in related_weak[:3]]
+            lines.append(f"Weak related concepts that may need review: {', '.join(weak_names)}.")
+
+        # Confusion
+        if confusion_points:
+            lines.append(f"Current confusion points: {', '.join(confusion_points)}.")
+
+        return " ".join(lines)
 
     # =========================================================================
     # NEW: Three-layer memory update

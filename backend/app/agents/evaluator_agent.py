@@ -95,98 +95,115 @@ class EvaluatorAgent:
         else:
             active_info = "  (No active concepts tracked yet)"
 
-        prompt = f"""Analyze this mentor-student interaction for learning quality insights.
+        prompt = f"""You are a silent pedagogical assessor. You never speak to the learner. You read a conversation exchange between a learner and mentor and produce a precise structured assessment. Your output is used to update the learner's cognitive model — accuracy matters above all else.
 
-STUDENT MESSAGE: "{user_message}"
-MENTOR RESPONSE: "{mentor_response[:500]}"
+Your output is consumed by another system, not the user. Produce ONLY valid JSON. No prose, no explanation, no markdown fences. The first character of your response must be {{ and the last must be }}.
+
+═══════════════════════════════════════════════════════
+STUDENT MESSAGE:
+"{user_message}"
+
+MENTOR RESPONSE:
+"{mentor_response[:2000]}"
 
 STUDENT CONTEXT:
-- Experience level: {profile.get('experience_level', 'beginner')}
-- Learning style: {profile.get('preferred_learning_style', 'mixed')}
-- Preferred tone: {profile.get('mentoring_tone', 'balanced')}
-- Session goal: {session.get('goal') or 'not yet established'}
-- Session momentum: {session.get('momentum', 'cold_start')}
-- Previous session clarity: {prev_clarity}/100
-- Active concepts:
+  Experience level: {profile.get('experience_level', 'beginner')}
+  Learning style: {profile.get('preferred_learning_style', 'mixed')}
+  Session goal: {session.get('goal') or 'not yet established'}
+  Session momentum: {session.get('momentum', 'cold_start')}
+  Previous session clarity: {prev_clarity}/100
+  Active concepts:
 {active_info}
-- Known confusion points: {', '.join(session.get('confusion_points', [])) or 'none'}
+  Known confusion points: {', '.join(session.get('confusion_points', [])) or 'none'}
+═══════════════════════════════════════════════════════
 
-IMPORTANT: Evaluate UNDERSTANDING QUALITY, not just activity or effort.
+─── CLARITY SCORING RUBRIC (you MUST use this) ───
+  0-20:  Learner expresses explicit confusion, cannot restate the concept, gives wrong answers, or says "I don't understand."
+  20-40: Learner partially follows but makes significant errors, shows fundamental misconceptions, or gives vague/incorrect paraphrasing.
+  40-60: Learner understands surface meaning but cannot apply the concept, explain WHY it works, or extend it to new situations.
+  60-80: Learner can apply the concept with some guidance. Mostly accurate. May need help with edge cases or nuances.
+  80-100: Learner can apply independently, explain to others, correct their own errors, and handle edge cases.
 
-CORE RULE (NON-NEGOTIABLE):
+Your clarity_score MUST be justified against these behavioral indicators. Do not assign a score without identifying which indicator range matches the learner's demonstrated behavior.
+
+─── CORE RULES (NON-NEGOTIABLE) ───
 Explicit expressions of confusion (e.g., "I don't get it", "I'm confused") must NEVER increase clarity score.
-- clarity_score must decrease or remain unchanged.
+- clarity_score must decrease or remain unchanged from {prev_clarity}.
 - understanding_delta must be <= 0.
 - confusion_trend must be "stable" or "worsening".
 
-WHAT NOT TO USE AS PROGRESS SIGNALS:
-- User continuing to chat
-- User asking questions
-- Mentor giving a long explanation
-- Polite tone or effort
-- Number of sessions
-(Effort != Understanding)
+WHAT IS NOT A PROGRESS SIGNAL (do not use these to increase clarity):
+- Learner continuing to chat (persistence != understanding)
+- Learner asking questions (curiosity != comprehension)
+- Mentor giving a long explanation (teaching != learning)
+- Polite tone or expressions of effort
 
-WHAT COUNTS AS POSITIVE UNDERSTANDING:
-- Paraphrasing the concept correctly
-- Applying concept to new example
-- Answering "why" or "how" correctly
-- Correcting a previous misconception
+WHAT COUNTS AS GENUINE UNDERSTANDING (use these to increase clarity):
+- Paraphrasing the concept correctly IN THEIR OWN WORDS
+- Applying the concept to a NEW example not given by the mentor
+- Answering "why" or "how" questions correctly
+- Correcting a previous misconception unprompted
+- Building on the concept to ask a deeper question
 
-## Confusion Classification (only if confusion or low clarity detected)
+─── CONCEPT EXTRACTION RULES ───
+Extract SPECIFIC technical concepts that were ACTIVELY DISCUSSED in this exchange — meaning they were explained, questioned about, practiced, demonstrated, or misunderstood.
 
-If clarity_score < 50 OR confusion markers are present, classify the
-type of confusion:
+DO extract: "recursion", "base case", "stack overflow", "function scope", "binary search"
+DO NOT extract: "programming", "coding", "computer science", "learning", "understanding"
 
-confusion_type: one of:
-  - "prerequisite_gap" — user lacks knowledge needed for this concept
-    (e.g., can't understand recursion because they don't get function scope)
-  - "misconception" — user has a specific wrong mental model
-    (e.g., thinks recursion creates copies of the function)
-  - "surface_confusion" — user doesn't understand the explanation/phrasing
-    but probably understands the concept (just needs it rephrased)
-  - "overwhelm" — user is trying to process too much at once
-    (e.g., "I don't know where to start")
-  - "none" — no confusion detected
+A concept is "actively discussed" if the conversation directly addressed it. Concepts merely mentioned in passing do NOT count.
 
-If confusion_type is "prerequisite_gap":
-  - missing_prerequisite: what concept/knowledge is missing?
+For each extracted concept, assign a concept-specific clarity score using the same rubric above.
 
-If confusion_type is "misconception":
-  - misconception_detail: what specifically do they believe that's wrong?
-  - correct_model: what should they understand instead?
+─── CONFUSION CLASSIFICATION ───
+If clarity_score < 50 OR confusion markers are present, classify the confusion type:
 
-If confusion_type is "overwhelm":
-  - overwhelm_source: too many concepts, too complex explanation, or lost context?
+  "prerequisite_gap" — Learner lacks foundational knowledge needed for this concept.
+    Example: Cannot understand recursion because they don't grasp function scope or the call stack.
+    → Set missing_prerequisite to the specific concept/knowledge that is missing.
 
-OUTPUT AS JSON:
+  "misconception" — Learner has a specific incorrect mental model.
+    Example: Believes recursion creates copies of the function in memory.
+    → Set misconception_detail to what they specifically believe that's wrong.
+    → Set correct_model to what they should understand instead.
+
+  "surface_confusion" — Learner doesn't understand the explanation/phrasing but likely grasps the concept. Needs it rephrased or shown differently.
+    Example: "I understand the idea but that code example confused me."
+
+  "overwhelm" — Learner is trying to process too many concepts at once.
+    Example: "I don't even know where to start" or "there's so much to this."
+    → Set overwhelm_source to: "too_many_concepts", "too_complex", or "lost_context".
+
+  "none" — No confusion detected. Learner is progressing.
+
+OUTPUT THIS EXACT JSON STRUCTURE:
 {{
     "clarity_score": 0-100,
     "confusion_trend": "improving" or "stable" or "worsening",
     "understanding_delta": -10 to +10,
-    "reasoning": "Explicit reason for score change",
+    "reasoning": "Explicit justification citing specific learner behavior that maps to the rubric range",
     "stagnation_flags": ["topic1", "topic2"] or [],
     "engagement_level": "high" or "medium" or "low",
-    "struggle_detected": null or "topic that needs attention",
+    "struggle_detected": null or "specific topic needing attention",
     "struggle_severity": "mild" or "moderate" or "significant",
-    "positive_signals": ["list of growth indicators"],
+    "positive_signals": ["list of specific growth indicators observed"],
     "response_effectiveness": "effective" or "neutral" or "needs_adjustment",
     "suggested_next_focus": "what to focus on next",
     "new_interest_detected": null or "new interest mentioned",
     "stage_change_recommended": null or "new stage suggestion",
     "pace_adjustment": null or "slow_down" or "speed_up" or "maintain",
-    "concepts_discussed": ["list of specific technical concepts mentioned or explained — e.g. recursion, base case, stack overflow — NOT vague terms like programming or coding"],
-    "concept_clarity": {{"concept_name": 0-100}} ,
+    "concepts_discussed": ["specific technical concepts actively discussed"],
+    "concept_clarity": {{"concept_name": 0-100}},
     "misconceptions_detected": {{"concept_name": "specific misunderstanding"}},
-    "confusion_type": "one of the types listed above",
+    "confusion_type": "prerequisite_gap, misconception, surface_confusion, overwhelm, or none",
     "missing_prerequisite": "concept name or null",
     "misconception_detail": "detail string or null",
     "correct_model": "correct model string or null",
     "overwhelm_source": "source string or null"
 }}
 
-BE HONEST. Do not inflate clarity_score.
-RESPOND ONLY WITH VALID JSON."""
+BE HONEST AND PRECISE. Do not inflate clarity_score. Justify every score against the rubric.
+Output ONLY valid JSON. No text before or after."""
 
         try:
             response = self.client.models.generate_content(
@@ -482,61 +499,120 @@ RESPOND ONLY WITH VALID JSON."""
         """
         prev_evaluations = user_context.get("progress", {}).get("evaluation_history", [])
         prev_clarity = prev_evaluations[-1].get("clarity_score", 50) if prev_evaluations else 50
+        
+        profile = user_context.get("profile", {})
+        session = user_context.get("session", {})
+        active_info = "  (No active concepts tracked yet)"
 
-        prompt = f"""Analyze this mentor-student interaction for learning quality insights.
+        prompt = f"""You are a silent pedagogical assessor. You never speak to the learner. You read a conversation exchange between a learner and mentor and produce a precise structured assessment. Your output is used to update the learner's cognitive model — accuracy matters above all else.
 
-STUDENT MESSAGE: "{user_message}"
-MENTOR RESPONSE: "{mentor_response[:500]}"
+Your output is consumed by another system, not the user. Produce ONLY valid JSON. No prose, no explanation, no markdown fences. The first character of your response must be {{ and the last must be }}.
+
+═══════════════════════════════════════════════════════
+STUDENT MESSAGE:
+"{user_message}"
+
+MENTOR RESPONSE:
+"{mentor_response[:2000]}"
 
 STUDENT CONTEXT:
-- Stage: {user_context.get('profile', {}).get('stage', 'unknown')}
-- Learning pace: {user_context.get('profile', {}).get('learning_pace', 'moderate')}
-- Known struggles: {[s.get('topic') for s in user_context.get('struggles', [])[:3]]}
-- Onboarding style preference: {user_context.get('onboarding', {}).get('mentoring_style', 'supportive')}
-- Previous clarity score: {prev_clarity}
+  Experience level: {profile.get('experience_level', 'beginner')}
+  Learning style: {profile.get('preferred_learning_style', 'mixed')}
+  Session goal: {session.get('goal') or 'not yet established'}
+  Session momentum: {session.get('momentum', 'cold_start')}
+  Previous session clarity: {prev_clarity}/100
+  Active concepts:
+{active_info}
+  Known confusion points: {', '.join(session.get('confusion_points', [])) or 'none'}
+═══════════════════════════════════════════════════════
 
-IMPORTANT: Evaluate UNDERSTANDING QUALITY, not just activity or effort.
+─── CLARITY SCORING RUBRIC (you MUST use this) ───
+  0-20:  Learner expresses explicit confusion, cannot restate the concept, gives wrong answers, or says "I don't understand."
+  20-40: Learner partially follows but makes significant errors, shows fundamental misconceptions, or gives vague/incorrect paraphrasing.
+  40-60: Learner understands surface meaning but cannot apply the concept, explain WHY it works, or extend it to new situations.
+  60-80: Learner can apply the concept with some guidance. Mostly accurate. May need help with edge cases or nuances.
+  80-100: Learner can apply independently, explain to others, correct their own errors, and handle edge cases.
 
-CORE RULE (NON-NEGOTIABLE):
+Your clarity_score MUST be justified against these behavioral indicators. Do not assign a score without identifying which indicator range matches the learner's demonstrated behavior.
+
+─── CORE RULES (NON-NEGOTIABLE) ───
 Explicit expressions of confusion (e.g., "I don't get it", "I'm confused") must NEVER increase clarity score.
-- clarity_score must decrease or remain unchanged.
+- clarity_score must decrease or remain unchanged from {prev_clarity}.
 - understanding_delta must be <= 0.
 - confusion_trend must be "stable" or "worsening".
 
-WHAT NOT TO USE AS PROGRESS SIGNALS:
-- User continuing to chat
-- User asking questions
-- Mentor giving a long explanation
-- Polite tone or effort
-- Number of sessions
-(Effort != Understanding)
+WHAT IS NOT A PROGRESS SIGNAL (do not use these to increase clarity):
+- Learner continuing to chat (persistence != understanding)
+- Learner asking questions (curiosity != comprehension)
+- Mentor giving a long explanation (teaching != learning)
+- Polite tone or expressions of effort
 
-WHAT COUNTS AS POSITIVE UNDERSTANDING:
-- Paraphrasing the concept correctly
-- Applying concept to new example
-- Answering "why" or "how" correctly
-- Correcting a previous misconception
+WHAT COUNTS AS GENUINE UNDERSTANDING (use these to increase clarity):
+- Paraphrasing the concept correctly IN THEIR OWN WORDS
+- Applying the concept to a NEW example not given by the mentor
+- Answering "why" or "how" questions correctly
+- Correcting a previous misconception unprompted
+- Building on the concept to ask a deeper question
 
-OUTPUT AS JSON:
+─── CONCEPT EXTRACTION RULES ───
+Extract SPECIFIC technical concepts that were ACTIVELY DISCUSSED in this exchange — meaning they were explained, questioned about, practiced, demonstrated, or misunderstood.
+
+DO extract: "recursion", "base case", "stack overflow", "function scope", "binary search"
+DO NOT extract: "programming", "coding", "computer science", "learning", "understanding"
+
+A concept is "actively discussed" if the conversation directly addressed it. Concepts merely mentioned in passing do NOT count.
+
+For each extracted concept, assign a concept-specific clarity score using the same rubric above.
+
+─── CONFUSION CLASSIFICATION ───
+If clarity_score < 50 OR confusion markers are present, classify the confusion type:
+
+  "prerequisite_gap" — Learner lacks foundational knowledge needed for this concept.
+    Example: Cannot understand recursion because they don't grasp function scope or the call stack.
+    → Set missing_prerequisite to the specific concept/knowledge that is missing.
+
+  "misconception" — Learner has a specific incorrect mental model.
+    Example: Believes recursion creates copies of the function in memory.
+    → Set misconception_detail to what they specifically believe that's wrong.
+    → Set correct_model to what they should understand instead.
+
+  "surface_confusion" — Learner doesn't understand the explanation/phrasing but likely grasps the concept. Needs it rephrased or shown differently.
+    Example: "I understand the idea but that code example confused me."
+
+  "overwhelm" — Learner is trying to process too many concepts at once.
+    Example: "I don't even know where to start" or "there's so much to this."
+    → Set overwhelm_source to: "too_many_concepts", "too_complex", or "lost_context".
+
+  "none" — No confusion detected. Learner is progressing.
+
+OUTPUT THIS EXACT JSON STRUCTURE:
 {{
     "clarity_score": 0-100,
     "confusion_trend": "improving" or "stable" or "worsening",
     "understanding_delta": -10 to +10,
-    "reasoning": "Explicit reason for score change (e.g., 'User stated confusion')",
+    "reasoning": "Explicit justification citing specific learner behavior that maps to the rubric range",
     "stagnation_flags": ["topic1", "topic2"] or [],
     "engagement_level": "high" or "medium" or "low",
-    "struggle_detected": null or "topic that needs attention",
+    "struggle_detected": null or "specific topic needing attention",
     "struggle_severity": "mild" or "moderate" or "significant",
-    "positive_signals": ["list of growth indicators"],
+    "positive_signals": ["list of specific growth indicators observed"],
     "response_effectiveness": "effective" or "neutral" or "needs_adjustment",
-    "suggested_next_focus": "what to focus on in future interactions",
+    "suggested_next_focus": "what to focus on next",
     "new_interest_detected": null or "new interest mentioned",
     "stage_change_recommended": null or "new stage suggestion",
-    "pace_adjustment": null or "slow_down" or "speed_up" or "maintain"
+    "pace_adjustment": null or "slow_down" or "speed_up" or "maintain",
+    "concepts_discussed": ["specific technical concepts actively discussed"],
+    "concept_clarity": {{"concept_name": 0-100}},
+    "misconceptions_detected": {{"concept_name": "specific misunderstanding"}},
+    "confusion_type": "prerequisite_gap, misconception, surface_confusion, overwhelm, or none",
+    "missing_prerequisite": "concept name or null",
+    "misconception_detail": "detail string or null",
+    "correct_model": "correct model string or null",
+    "overwhelm_source": "source string or null"
 }}
 
-BE HONEST. Do not inflate clarity_score.
-RESPOND ONLY WITH VALID JSON."""
+BE HONEST AND PRECISE. Do not inflate clarity_score. Justify every score against the rubric.
+Output ONLY valid JSON. No text before or after."""
 
         try:
             response = self.client.models.generate_content(

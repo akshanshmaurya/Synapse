@@ -115,6 +115,7 @@ def _setup_orchestrator():
 def _patch_chat_service(mock_chat_svc):
     """Configure the chat service mock with all needed async methods."""
     mock_chat_svc.get_or_create_active_chat = AsyncMock(return_value="chat-123")
+    mock_chat_svc.create_chat_session = AsyncMock(return_value="chat-123")
     mock_chat_svc.add_message = AsyncMock()
     mock_chat_svc.update_chat_title = AsyncMock()
     mock_chat_svc.get_message_count = AsyncMock(return_value=1)
@@ -374,9 +375,10 @@ class TestPipelineStreaming:
 
         orch = _setup_orchestrator()
         _setup_agents(orch, response="fallback")
-        orch.executor_agent.generate_response_stream = MagicMock(
-            return_value=iter(["Hello", " world"])
-        )
+        async def mock_stream(*args, **kwargs):
+            for chunk in ["Hello", " world"]:
+                yield chunk
+        orch.executor_agent.generate_response_stream_async = mock_stream
 
         streamed = []
 

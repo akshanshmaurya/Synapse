@@ -214,62 +214,91 @@ class PlannerAgent:
                 lines.append(f"  {role}: {content}")
             recent_section = "\n".join(lines)
 
-        prompt = f"""You are a planning agent for an AI mentor. Analyze this context and decide the guidance strategy.
+        prompt = f"""You are a pedagogical strategist for an AI mentoring system. You are NOT a chatbot. You never speak to the learner. Your ONLY job is to analyze the learner's current state and produce a structured JSON strategy object that tells the Executor agent HOW to respond.
 
-## User Profile
-Experience: {profile.get('experience_level', 'beginner')}
-Learning style: {profile.get('preferred_learning_style', 'mixed')}
-Preferred tone: {profile.get('mentoring_tone', 'balanced')}
-Career interests: {', '.join(profile.get('career_interests', [])) or 'not specified'}
-Known strengths: {', '.join(profile.get('strengths_summary', [])) or 'none yet'}
-Known weaknesses: {', '.join(profile.get('weaknesses_summary', [])) or 'none yet'}
+Your output is consumed by another agent, not the user. Produce ONLY valid JSON. No prose, no explanation, no markdown fences. The first character of your response must be {{ and the last must be }}.
 
-## Session State
-Goal: {session.get('goal') or 'Not yet established — infer from message'}
-Momentum: {session.get('momentum', 'cold_start')}
-Session clarity: {session.get('clarity', 50.0)}/100
-Messages so far: {session.get('message_count', 0)}
-Active concepts: {', '.join(session.get('active_concepts', [])) or 'none yet'}
-Current confusion: {', '.join(session.get('confusion_points', [])) or 'none'}
+═══════════════════════════════════════════════════════
+LEARNER PROFILE:
+  Experience: {profile.get('experience_level', 'beginner')}
+  Learning style: {profile.get('preferred_learning_style', 'mixed')}
+  Preferred tone: {profile.get('mentoring_tone', 'balanced')}
+  Career interests: {', '.join(profile.get('career_interests', [])) or 'not specified'}
+  Known strengths: {', '.join(profile.get('strengths_summary', [])) or 'none yet'}
+  Known weaknesses: {', '.join(profile.get('weaknesses_summary', [])) or 'none yet'}
 
-## Concept Mastery (relevant)
+SESSION STATE:
+  Goal: {session.get('goal') or 'Not yet established — infer from message'}
+  Momentum: {session.get('momentum', 'cold_start')}
+  Session clarity: {session.get('clarity', 50.0)}/100
+  Messages so far: {session.get('message_count', 0)}
+  Active concepts: {', '.join(session.get('active_concepts', [])) or 'none yet'}
+  Current confusion: {', '.join(session.get('confusion_points', [])) or 'none'}
+
+CONCEPT MASTERY:
 {concept_section}
 
-## Last Evaluation Context (Phase 5.2 metrics)
-Confusion type: {last_eval.get('confusion_type', 'none')}
-Missing prerequisites: {', '.join(last_eval.get('missing_prerequisites', [])) or 'none'}
-Scaffolding recommendation: {last_eval.get('scaffolding_recommendation', 'full')}
-ZPD Alignment Data: {json.dumps(last_eval.get('zpd_alignment', {{}}))}
+LAST EVALUATION:
+  Confusion type: {last_eval.get('confusion_type', 'none')}
+  Missing prerequisites: {', '.join(last_eval.get('missing_prerequisites', [])) or 'none'}
+  Scaffolding recommendation: {last_eval.get('scaffolding_recommendation', 'full')}
+  ZPD alignment: {json.dumps(last_eval.get('zpd_alignment', {{}}))}
 
-## Learning Patterns & Velocity (Phase 5.1 metrics)
-Overall velocity: {pattern_insights.get('velocity', {{}}).get('overall_velocity', 'unknown')}
-Primary struggle pattern: {pattern_insights.get('struggle_patterns', {{}}).get('primary_struggle_type') or 'none'}
+LEARNING PATTERNS:
+  Overall velocity: {pattern_insights.get('velocity', {{}}).get('overall_velocity', 'unknown')}
+  Primary struggle pattern: {pattern_insights.get('struggle_patterns', {{}}).get('primary_struggle_type') or 'none'}
 
-## Recent Conversation
+RECENT CONVERSATION:
 {recent_section or '(No prior messages in this session)'}
 
-## Context Summary
+CONTEXT SUMMARY:
 {user_context.get('context_summary', 'New user')}
+═══════════════════════════════════════════════════════
 
-## Task
-Given the user's message: "{current_message}"
-And the above context, decide:
+THE LEARNER'S MESSAGE: "{current_message}"
 
-OUTPUT A JSON OBJECT with this structure:
+─── STRATEGY DEFINITIONS (choose one) ───
+  "explain"    — Full comprehensive explanation needed. Learner asked a conceptual question or needs to understand something from scratch. Requires definition + intuition + example.
+  "guide"      — Walk learner through step by step. Build incrementally from what they know. Use guiding questions. Good for moderate mastery topics.
+  "challenge"  — Learner understands the basics. Push deeper with problems, edge cases, or application questions that require them to think.
+  "encourage"  — Learner is stuck or losing confidence. Prioritize emotional support, then simplify. Rebuild from known foundations.
+  "correct_misconception" — Learner has a specific wrong mental model. Must name it, explain why it's wrong, rebuild the correct model.
+  "simplify"   — Learner is overwhelmed. Strip to core idea, everyday analogies, one concept at a time.
+  "redirect"   — Learner needs prerequisites. Explain which prerequisite is missing and begin teaching it.
+  "review"     — Learner is consolidating. Confirm what they know, gently correct gaps, reinforce understanding.
+
+─── DECISION CRITERIA ───
+  Low clarity (<40) + stuck momentum → "encourage" or "simplify"
+  Low clarity (<40) + prerequisite gap → "redirect"
+  Medium clarity (40-70) + warming/flowing → "guide"
+  High clarity (>70) + flowing momentum → "challenge"
+  Misconception detected → "correct_misconception"
+  First message (message_count == 0) → "guide" (orient the learner)
+  Confusion detected but learner is engaged → "explain" with slow pacing
+  Learner asks for deep understanding → "explain" with deep response_depth
+
+─── RESPONSE DEPTH DEFINITIONS ───
+  "surface"        — 2-4 sentences. Greetings, casual chat, simple yes/no.
+  "standard"       — 150-250 words. Definition + intuition + one example. Default for most learning.
+  "deep"           — 250-400 words. Multiple examples, edge cases, connections. For building new mental models.
+  "comprehensive"  — 400+ words. Full teaching module. Worked problems, pitfalls, big picture.
+
+OUTPUT THIS EXACT JSON STRUCTURE:
 {{
-    "strategy": "one of: explain, guide, challenge, review, encourage, redirect",
-    "tone": "warm, gentle, direct, curious, or affirming — adapt to momentum (if stuck, be more supportive regardless of preference)",
-    "pacing": "slow, medium, or fast — based on session clarity and experience level",
-    "focus_concepts": ["list of concept names the response should focus on"],
-    "should_assess": true or false (should this response include a comprehension check?),
-    "session_goal_inference": "if no session goal is set, what does this message suggest the goal is? null if already set",
-    "focus_areas": ["list of topics to address"],
+    "strategy": "one of: explain, guide, challenge, review, encourage, redirect, correct_misconception, simplify",
+    "tone": "one of: warm, supportive, balanced, direct, curious, challenging",
+    "pacing": "one of: slow, medium, fast",
+    "response_depth": "one of: surface, standard, deep, comprehensive",
+    "focus_concepts": ["specific concept names to address"],
+    "should_assess": true or false,
+    "session_goal_inference": "inferred goal string or null if goal already set",
+    "focus_areas": ["topics to address"],
     "should_ask_question": true or false,
-    "detected_emotion": "neutral, frustrated, excited, confused, or discouraged",
+    "detected_emotion": "one of: neutral, frustrated, excited, confused, discouraged, curious",
     "roadmap_relevant": true or false,
     "verbosity": "brief, normal, or detailed",
-    "max_lines": 6,
-    "chat_intent": "short 3-5 word description of what this conversation is about",
+    "max_lines": 30,
+    "chat_intent": "short 3-5 word description",
     "memory_update": {{
         "new_interest": null or "string",
         "new_goal": null or "string",
@@ -277,18 +306,13 @@ OUTPUT A JSON OBJECT with this structure:
     }}
 }}
 
-VERBOSITY RULES:
-- Use "brief" (4 lines) for simple acknowledgments, greetings, quick encouragement
-- Use "normal" (6 lines) for standard mentoring responses
-- Use "detailed" (8 lines) ONLY for complex explanations or teaching moments
-
-STRATEGY RULES:
-- If momentum is "stuck", prefer "encourage" or "review" — do NOT push forward
-- If this is the first message (message_count == 0), prefer "guide" to orient the user
-- If clarity > 80 and momentum is "flowing", you may use "challenge"
-- Always consider concept mastery when choosing focus_concepts
-
-RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
+CRITICAL RULES:
+- Output ONLY valid JSON. No text before or after.
+- "max_lines" must be 30 (the Executor controls its own depth).
+- Choose "response_depth" based on the complexity of the learner's question and their current state. Default to "standard" unless the question is clearly simple (surface) or clearly complex (deep/comprehensive).
+- If momentum is "stuck", you MUST choose "encourage", "simplify", or "review" — never "challenge".
+- "tone" should adapt to emotional state: frustrated/discouraged learners need "warm" or "supportive" regardless of their profile preference.
+- Consider concept mastery when choosing focus_concepts — reference the mastery data above."""
 
         try:
             response = self.client.models.generate_content(
@@ -375,6 +399,7 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
             "strategy": "guide",
             "tone": "warm",
             "pacing": "medium",
+            "response_depth": "standard",
             "focus_concepts": [],
             "should_assess": False,
             "session_goal_inference": None,
@@ -383,7 +408,7 @@ RESPOND ONLY WITH VALID JSON, NO OTHER TEXT."""
             "detected_emotion": "neutral",
             "roadmap_relevant": False,
             "verbosity": "normal",
-            "max_lines": 6,
+            "max_lines": 30,
             "chat_intent": "new conversation",
             "memory_update": {
                 "new_interest": None,

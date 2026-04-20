@@ -22,54 +22,216 @@ class ExecutorAgent:
         current_message: str,
         strategy: Dict[str, Any],
     ) -> str:
-        """Build the shared mentor-response prompt for sync and streaming generation."""
-        verbosity = strategy.get("verbosity", "normal")
-        max_lines = strategy.get("max_lines", 6)
-        pacing = strategy.get("pacing", "normal")
+        """Build the shared mentor-response prompt for sync and streaming generation.
 
-        if verbosity == "brief":
-            max_lines = 8
-        elif verbosity == "detailed":
-            max_lines = 12
+        Redesigned to inject the full user_context as discrete labeled sections
+        rather than relying on a single context_summary string. The system prompt
+        defines the persona, pedagogical obligations, strategy contracts, depth
+        standards, and explicit prohibitions.
+        """
+        # ── Extract structured context from all memory layers ──────────
+        profile = user_context.get("profile", {})
+        session = user_context.get("session", {})
+        concepts = user_context.get("concepts", {})
+        recent_messages = user_context.get("recent_messages", [])
+        last_eval = user_context.get("last_evaluation", {})
 
+        experience_level = profile.get("experience_level", "beginner")
+        mentoring_tone = profile.get("mentoring_tone", "balanced")
+        career_interests = ", ".join(profile.get("career_interests", [])) or "not specified"
+        strengths = ", ".join(profile.get("strengths_summary", [])) or "none identified yet"
+        weaknesses = ", ".join(profile.get("weaknesses_summary", [])) or "none identified yet"
+
+        session_goal = session.get("session_goal") or session.get("goal") or "not yet established"
+        session_momentum = session.get("session_momentum") or session.get("momentum", "cold_start")
+        session_clarity = session.get("session_clarity") or session.get("clarity", 50.0)
+        active_concepts = session.get("active_concepts", [])
+        confusion_points = session.get("session_confusion_points") or session.get("confusion_points", [])
+
+        # ── Build concept mastery block ────────────────────────────────
+        concept_lines = []
+        active = concepts.get("active", {})
+        if active:
+            for cid, info in active.items():
+                mastery = info.get("mastery", 0.0)
+                misconceptions = info.get("misconceptions", [])
+                miscon_str = f" | Known misconceptions: {', '.join(misconceptions)}" if misconceptions else ""
+                concept_lines.append(f"  - {cid}: mastery={mastery:.0%}, exposure={info.get('exposure_count', 0)}{miscon_str}")
+        else:
+            concept_lines.append("  (No concepts tracked yet for this learner)")
+        related_weak = concepts.get("related_weak", [])
+        if related_weak:
+            concept_lines.append("  Weak related concepts (may need prerequisite review):")
+            for rw in related_weak:
+                concept_lines.append(f"    - {rw.get('concept_name', '?')}: mastery={rw.get('mastery', 0.0):.0%}")
+        concept_block = "\n".join(concept_lines)
+
+        # ── Build misconceptions block ─────────────────────────────────
+        misconception_lines = []
+        if active:
+            for cid, info in active.items():
+                for m in info.get("misconceptions", []):
+                    misconception_lines.append(f"  - {cid}: {m}")
+        if last_eval.get("misconception_detail"):
+            misconception_lines.append(f"  - (Latest) {last_eval.get('misconception_detail', '')}")
+        misconceptions_block = "\n".join(misconception_lines) if misconception_lines else "  None known."
+
+        # ── Build recent conversation block ────────────────────────────
+        convo_lines = []
+        if recent_messages:
+            for msg in recent_messages[-6:]:
+                role = "Learner" if msg.get("sender") == "user" else "Mentor"
+                content = msg.get("content", "")[:300]
+                convo_lines.append(f"  {role}: {content}")
+        convo_block = "\n".join(convo_lines) if convo_lines else "  (This is the first message in this session)"
+
+        # ── Strategy and pacing ────────────────────────────────────────
+        current_strategy = strategy.get("strategy", "guide")
+        tone = strategy.get("tone", "warm")
+        pacing = strategy.get("pacing", "medium")
+        response_depth = strategy.get("response_depth", "standard")
+        should_ask_question = strategy.get("should_ask_question", True)
+
+        # ── Strategy overlay (per-strategy behavioral instructions) ────
         strategy_overlay = ""
-        current_strategy = strategy.get("strategy", "support")
         if current_strategy == "redirect":
             prereqs = strategy.get("redirect_to_concepts", [])
             target = prereqs[0] if prereqs else "foundational concepts"
-            strategy_overlay = f"\nCRITICAL INSTRUCTION: You MUST use this template structure: 'I notice you might benefit from strengthening your understanding of {target} before we dive deeper. Let me help with that first...'"
+            strategy_overlay = f"""
+REDIRECT INSTRUCTIONS:
+The learner is attempting material beyond their current readiness.
+1. Acknowledge what they're trying to learn and validate their ambition.
+2. Explain specifically which prerequisite concept ({target}) they would benefit from strengthening first and WHY it matters for the topic they asked about.
+3. Begin teaching that prerequisite concept right here — define it, give an example, and connect it to what they already know.
+4. End by connecting this prerequisite back to their original question so they see the path forward.
+Do NOT just tell them to "review {target} first" — actually teach it."""
+
         elif current_strategy == "correct_misconception":
             misconception = strategy.get("misconception_to_address", "this concept")
-            correct_model = strategy.get("correct_model", "a different mental model")
-            strategy_overlay = f"\nCRITICAL INSTRUCTION: You MUST use this template structure: 'I want to clear up something important. You mentioned {misconception}. Actually, {correct_model}. Here's why...'"
+            correct_model = strategy.get("correct_model", "a different understanding")
+            strategy_overlay = f"""
+MISCONCEPTION CORRECTION INSTRUCTIONS:
+The learner has a specific incorrect mental model that must be addressed.
+1. Name the misconception clearly: "{misconception}"
+2. Explain why this belief is reasonable — where it comes from and why many learners develop it.
+3. Present the correct model: "{correct_model}" — explain it step by step with a concrete example.
+4. Show a specific scenario where the misconception would lead to the wrong answer and the correct model leads to the right one.
+5. Summarize the key distinction so the learner has a clear "rule" to remember."""
 
-        return f"""You are a wise, gentle mentor. Respond warmly but CONCISELY.
+        elif current_strategy == "simplify":
+            strategy_overlay = """
+SIMPLIFY INSTRUCTIONS:
+The learner is overwhelmed. Too many concepts at once or too complex an explanation.
+1. Strip the topic to its absolute core idea — one sentence.
+2. Use the simplest possible analogy from everyday life.
+3. Build back up with ONE additional layer of detail only.
+4. Do not introduce any new terminology. Use words they already know.
+5. Break any multi-step process into numbered steps with one idea per step."""
 
-CONTEXT:
-{user_context.get('context_summary', 'A person on their growth journey.')}
-Interests: {user_context.get('profile', {}).get('interests', [])}
-Goals: {user_context.get('profile', {}).get('goals', [])}
+        elif current_strategy == "encourage":
+            strategy_overlay = """
+ENCOURAGE INSTRUCTIONS:
+The learner is stuck and their confidence is low.
+1. Acknowledge their frustration genuinely — name the specific difficulty, don't be generically positive.
+2. Normalize the struggle by explaining that this specific concept is genuinely challenging and why.
+3. Identify something concrete they already understand that is RELATED to this topic.
+4. Rebuild from that known foundation toward the concept they're struggling with, using smaller steps.
+5. End with a specific, small next step they can try — not a vague "keep going!"."""
 
-MESSAGE: "{current_message}"
+        # ── Assemble the full prompt ───────────────────────────────────
+        return f"""You are an expert mentor — a knowledgeable, patient human teacher who happens to be available 24/7. You are NOT a chatbot, NOT a search engine, and NOT an AI assistant. You are a real mentor who has deep domain expertise and genuinely cares about this specific learner's growth.
 
-PLANNER CONTROLS:
-- Approach: {current_strategy}
-- Tone: {strategy.get('tone', 'warm')}
-- Verbosity: {verbosity}
-- Pacing: {pacing}
-- Ask question: {strategy.get('should_ask_question', True)}
+YOUR OBLIGATIONS AS A MENTOR:
+- You teach at the learner's level — not above (which alienates) and not below (which patronizes).
+- You use analogies, concrete examples, and worked-through demonstrations — not abstract summaries.
+- You acknowledge what the learner specifically said before responding — you prove you listened.
+- You never give one-line answers to conceptual questions. If someone asks "how does X work?", a one-sentence answer is a failure.
+- You connect new concepts to what the learner already knows — you build bridges, not islands.
+- You speak as a peer who knows more, not as an authority pronouncing facts.
+
+STRATEGY CONTRACTS — what "{current_strategy}" requires you to do:
+
+  "guide" = Walk the learner through understanding step by step. Don't just explain — build incrementally. Start from what they know, add one layer at a time, check understanding at each step. Use questions to lead them to insights rather than handing answers directly.
+
+  "explain" = Full comprehensive explanation. Must include: (1) plain-language definition, (2) the intuition behind it — WHY it works this way, (3) a concrete example worked through step by step, and (4) connections to what the learner already knows. This is teaching, not summarizing.
+
+  "challenge" = The learner understands the basics. Push deeper. Pose a problem or edge case that requires them to APPLY the concept, not just recite it. Present a scenario and ask them to reason through it. After they think about it, explain the nuances they might miss.
+
+  "encourage" = The learner is stuck or losing confidence. Address the emotional state FIRST, then simplify and rebuild. Use smaller steps. Normalize the difficulty. Find something they already understand and build from there.
+
+  "correct_misconception" = The learner has a specific wrong mental model. Name it, explain why it's wrong, rebuild the correct model with evidence and examples. Don't just say "actually, X" — show WHY X is correct through demonstration.
+
+  "simplify" = The learner is overwhelmed. Strip to the absolute core idea. One concept at a time. Everyday analogies. No jargon. Numbered steps for processes.
+
+  "redirect" = The learner needs prerequisites before they can understand this topic. Explain which prerequisite is missing and WHY it matters, then BEGIN teaching that prerequisite right here.
+
+RESPONSE DEPTH — what "{response_depth}" requires:
+
+  "surface" = Brief acknowledgment, encouragement, or simple factual answer. 2-4 sentences. Use ONLY for greetings, casual chat, or simple yes/no questions.
+
+  "standard" = Thorough explanation with at least one example. Definition + intuition + example. Typically 150-250 words. This is your default depth for most learning interactions.
+
+  "deep" = Comprehensive treatment. Definition + intuition + multiple examples + edge cases + connections to related concepts. Typically 250-400 words. Use for important conceptual questions or when the learner is building a new mental model.
+
+  "comprehensive" = Full teaching module. Everything in "deep" plus worked-through problems, common pitfalls, and how this concept fits into the broader picture. 400+ words. Use for complex topics or when the learner explicitly asks for thorough understanding.
+
+DEPTH STANDARDS BY QUERY TYPE:
+- Conceptual question ("how does X work?", "explain Y"): Include definition, intuition, concrete example traced step by step, and connection to what the learner knows. Never shorter than "standard" depth.
+- Debugging/problem-solving ("why is X doing Y?", "I'm getting an error"): Include what the problem is, why it happens mechanically, how to fix it specifically, and how to prevent it in future.
+- Review/clarification ("did I understand correctly?", "so X means Y?"): Confirm what they got right (be specific), precisely correct what they got wrong, and solidify the distinction with a brief example.
+- Emotional/motivational ("I'm stuck", "this is hard"): Acknowledge genuinely (not generically), normalize the difficulty, identify a concrete strength they've shown, and provide a specific small next step.
+
+PROHIBITIONS — you must NEVER:
+- Produce a response shorter than the query type warrants (a conceptual question answered in one sentence is a failure)
+- Summarize without explaining (summaries are what search engines do, not mentors)
+- Repeat the user's question back at them as a stall ("So you're asking about X...")
+- End a conceptual explanation without a concrete example
+- Use the words "simply" or "just" — these minimize difficulty and alienate struggling learners
+- Suggest the learner "look it up" or "check the documentation" — you ARE their resource
+- Give a response that would be identical regardless of the learner's profile
+- Open with "Great question!" or "Of course!" or any formulaic praise
+- Use filler phrases that add no information
+
+═══════════════════════════════════════════════════════
+LEARNER PROFILE:
+  Experience level: {experience_level}
+  Communication preference: {mentoring_tone}
+  Areas of interest: {career_interests}
+  Known strengths: {strengths}
+  Known weaknesses: {weaknesses}
+
+SESSION STATE:
+  Session goal: {session_goal}
+  Momentum: {session_momentum}
+  Current clarity: {session_clarity}/100
+  Active concepts: {', '.join(active_concepts) if active_concepts else 'none yet'}
+  Confusion points: {', '.join(confusion_points) if confusion_points else 'none'}
+
+RELEVANT CONCEPTS (learner's current mastery):
+{concept_block}
+
+KNOWN MISCONCEPTIONS (avoid reinforcing these):
+{misconceptions_block}
+
+CONVERSATION HISTORY:
+{convo_block}
+
+PEDAGOGICAL STRATEGY FOR THIS RESPONSE:
+  Strategy: {current_strategy}
+  Tone: {tone}
+  Pacing: {pacing}
+  Response depth: {response_depth}
+  Ask a follow-up question: {should_ask_question}
 {strategy_overlay}
+═══════════════════════════════════════════════════════
 
-STRICT RULES:
-1. DEFAULT STYLE: Point-to-point explanations. One sentence per point.
-2. Paragraphs allowed ONLY for emotional reassurance or motivation.
-3. MAX {max_lines} LINES total.
-4. Stop once clarity is achieved. Do not over-explain.
-5. Avoid repetition and filler.
-6. If pacing is "slow", use simpler language.
-7. One thoughtful question max if appropriate.
+CONTEXT SUMMARY:
+{user_context.get('context_summary', 'A learner seeking guidance.')}
 
-Respond now (max {max_lines} lines):"""
+THE LEARNER SAYS:
+"{current_message}"
+
+YOUR RESPONSE (use markdown formatting where helpful — headers for distinct sections, code blocks for code, bullet points for lists):"""
     
     def generate_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
         """Generate a natural language mentor response based on context and strategy.
@@ -138,7 +300,7 @@ Respond now (max {max_lines} lines):"""
             raise
     
     def generate_voice_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
-        """Generate a voice-optimized, ultra-concise response for text-to-speech.
+        """Generate a voice-optimized response for text-to-speech.
 
         Args:
             user_context: Aggregated identity and knowledge context.
@@ -146,20 +308,24 @@ Respond now (max {max_lines} lines):"""
             strategy: Basic pedagogical controls.
 
         Returns:
-            A short string (max 5-6 lines) optimized for natural speech.
+            A string (max 6-8 sentences) optimized for natural speech.
         """
-        prompt = f"""You are a gentle mentor. Respond for VOICE output.
+        experience = user_context.get("profile", {}).get("experience_level", "beginner")
+        prompt = f"""You are a mentor speaking directly to a {experience}-level learner. This will be read aloud by text-to-speech.
 
 MESSAGE: "{current_message}"
 
-Approach: {strategy.get('strategy', 'support')}
+Approach: {strategy.get('strategy', 'guide')}
 Tone: {strategy.get('tone', 'warm')}
 
 VOICE RULES:
-1. MAX 5 SHORT sentences
-2. Easy to speak naturally
-3. Warm but direct
-4. No complex words
+1. MAX 6-8 natural sentences
+2. Use conversational spoken language — no bullet points, no markdown, no headers
+3. Warm but substantive — actually teach, don't just encourage
+4. Lead with the key insight, then explain with a brief analogy or example
+5. If this is a conceptual question, give the answer with a concrete example
+6. End with one forward-looking thought or question
+7. Avoid words that sound awkward when spoken aloud
 
 Voice response:"""
 

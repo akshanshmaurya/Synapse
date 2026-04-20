@@ -51,7 +51,7 @@ export default function MentorPage() {
     const toggleInsights = useCallback(() => {
         setInsightsOpen(prev => {
             const next = !prev;
-            try { localStorage.setItem("synapse_insights_panel", next ? "open" : "closed"); } catch {}
+            try { localStorage.setItem("synapse_insights_panel", next ? "open" : "closed"); } catch { /* ignore error during local storage access */ }
             return next;
         });
     }, []);
@@ -73,7 +73,7 @@ export default function MentorPage() {
         try {
             if (chatId) sessionStorage.setItem("synapse_active_chat_id", chatId);
             else sessionStorage.removeItem("synapse_active_chat_id");
-        } catch {}
+        } catch { /* ignore error during local storage access */ }
     }, [chatId]);
 
     // ── Restore messages on mount if returning to a persisted session
@@ -361,7 +361,7 @@ export default function MentorPage() {
     };
 
     const handleLogout = () => {
-        try { sessionStorage.removeItem("synapse_active_chat_id"); } catch {}
+        try { sessionStorage.removeItem("synapse_active_chat_id"); } catch { /* ignore error during local storage access */ }
         logout();
         navigate("/");
     };
