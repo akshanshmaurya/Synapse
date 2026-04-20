@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
 import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 import { useSessionContext } from "@/hooks/useSessionContext";
-import { useMentorSocket } from "@/hooks/use-mentor-socket";
+import { useMentorSocket, WsConnectionState } from "@/hooks/use-mentor-socket";
 import SessionGoalBanner from "@/components/chat/SessionGoalBanner";
 import MomentumIndicator from "@/components/chat/MomentumIndicator";
 import ActiveConceptsBar from "@/components/chat/ActiveConceptsBar";
@@ -203,7 +203,7 @@ export default function MentorPage() {
     }, []);
 
     // ── Wire up WebSocket ──────────────────────────────────────────
-    const { isConnected: wsConnected, sendMessage: wsSendMessage } = useMentorSocket({
+    const { connectionState: wsState, sendMessage: wsSendMessage } = useMentorSocket({
         sessionId: chatId ?? "new",
         onToken: handleWsToken,
         onDone: handleWsDone,
@@ -309,10 +309,11 @@ export default function MentorPage() {
         streamingBubbleIdRef.current = null;
         streamingContentRef.current = "";
 
-        // ── Try WebSocket first (only for established sessions) ────
-        // Skip WS when chatId is null to avoid race conditions during
-        // the "new" → real session transition. REST handles it atomically.
-        if (chatId && wsSendMessage(userText)) {
+        // ── Try WebSocket first (primary transport) ─────────────────
+        // The hook connects to "new" when chatId is null — the backend
+        // creates a session atomically and returns the real chat_id in
+        // the "done" message, so streaming works from the first message.
+        if (wsSendMessage(userText)) {
             pendingUserMessageRef.current = userText;
             return;
         }
@@ -478,12 +479,17 @@ export default function MentorPage() {
                                 </h1>
                                 <div className="flex items-center gap-1.5">
                                     <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-700 ${
-                                        wsConnected
+                                        wsState === WsConnectionState.OPEN
                                             ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
-                                            : "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.4)] animate-pulse"
+                                            : wsState === WsConnectionState.RECONNECTING || wsState === WsConnectionState.CONNECTING
+                                            ? "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.4)] animate-pulse"
+                                            : "bg-gray-400 shadow-[0_0_6px_rgba(156,163,175,0.3)]"
                                     }`} />
                                     <span className="mono-tag text-[8px] text-[#8B8178]/50">
-                                        {wsConnected ? "// Live · AI Mentor" : "// Reconnecting..."}
+                                        {wsState === WsConnectionState.OPEN ? "// Live · AI Mentor"
+                                         : wsState === WsConnectionState.RECONNECTING ? "// Reconnecting..."
+                                         : wsState === WsConnectionState.CONNECTING ? "// Connecting..."
+                                         : "// Standby"}
                                     </span>
                                 </div>
                             </div>

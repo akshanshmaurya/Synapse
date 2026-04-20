@@ -106,7 +106,7 @@ class AgentOrchestrator:
 
         t0 = time.monotonic()
         chunks = []
-        for chunk in self.executor_agent.generate_response_stream(
+        async for chunk in self.executor_agent.generate_response_stream_async(
             prepared["user_context"],
             message,
             prepared["strategy"],

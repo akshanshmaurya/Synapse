@@ -114,6 +114,28 @@ Respond now (max {max_lines} lines):"""
         except Exception as e:
             logger.error("Executor streaming error: %s", e)
             raise
+
+    async def generate_response_stream_async(
+        self,
+        user_context: Dict[str, Any],
+        current_message: str,
+        strategy: Dict[str, Any],
+    ):
+        """Yield raw model chunks asynchronously for real-time WebSocket streaming."""
+        prompt = self._build_response_prompt(user_context, current_message, strategy)
+
+        try:
+            response_stream = await self.client.aio.models.generate_content_stream(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+            )
+            async for chunk in response_stream:
+                text = getattr(chunk, "text", None)
+                if text:
+                    yield text
+        except Exception as e:
+            logger.error("Executor async streaming error: %s", e)
+            raise
     
     def generate_voice_response(self, user_context: Dict[str, Any], current_message: str, strategy: Dict[str, Any]) -> str:
         """Generate a voice-optimized, ultra-concise response for text-to-speech.
