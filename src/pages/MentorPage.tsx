@@ -33,6 +33,12 @@ export default function MentorPage() {
         }
     ]);
     const [isReflecting, setIsReflecting] = useState(false);
+    const [latestEvaluation, setLatestEvaluation] = useState<{
+        clarity_score: number;
+        understanding_delta: number;
+        confusion_trend: string;
+        engagement_level: string;
+    } | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -186,6 +192,13 @@ export default function MentorPage() {
 
         // Refresh session context in background
         refreshSessionContext().catch(() => {});
+
+        // Delayed second refresh to capture async evaluator output.
+        // The evaluator runs after the response is sent, so session_clarity
+        // won't be updated until ~2s later.
+        setTimeout(() => {
+            refreshSessionContext().catch(() => {});
+        }, 2500);
     }, [chatId, refreshSessionContext]);
 
     const handleWsError = useCallback((message: string) => {
@@ -253,6 +266,7 @@ export default function MentorPage() {
         setIsReflecting(false);
         setShowHistory(false);
         setHistoryError(null);
+        setLatestEvaluation(null);
     }, []);
 
     const handleSelectSession = async (session: ChatSession) => {
@@ -260,6 +274,7 @@ export default function MentorPage() {
         setHistoryError(null);
         setChatId(session._id);
         setShowHistory(false);
+        setLatestEvaluation(null);
         const messages = await fetchChatMessages(session._id);
         const loadedReflections: Reflection[] = messages.map((msg: ChatMessage) => ({
             id: msg._id,
@@ -334,6 +349,9 @@ export default function MentorPage() {
                 evaluation: result.evaluation
             };
             setReflections(prev => [...prev, guidance]);
+            if (result.evaluation) {
+                setLatestEvaluation(result.evaluation);
+            }
             const audio = await streamAudio(result.response);
             if (audio) {
                 audio.play().catch(() => {});
@@ -736,6 +754,9 @@ export default function MentorPage() {
                     sessionContext={sessionContext}
                     sessionContextLoading={sessionContextLoading}
                     reflections={reflections}
+                    latestEvaluation={latestEvaluation}
+                    isReflecting={isReflecting}
+                    chatId={chatId}
                 />
             </div>
 

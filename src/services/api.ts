@@ -106,6 +106,7 @@ export async function sendMessage(message: string, chatId?: string): Promise<Cha
     return {
         response: data.response,
         chatId: data.chat_id || null,
+        evaluation: data.evaluation || undefined,
     };
 }
 
@@ -701,5 +702,44 @@ export async function fetchLearningReport(): Promise<LearningReport | null> {
         return await response.json();
     } catch {
         return null;
+    }
+}
+
+
+// ─── Trace Logs API ───────────────────────────────────────────────────
+
+export interface TraceEntry {
+    trace_id: string;
+    request_id: string;
+    agent: string;
+    action: string;
+    decision: string | null;
+    reasoning: string | null;
+    output_summary: string | null;
+    input_summary: string | null;
+    details: Record<string, unknown> | null;
+    timestamp: string;
+}
+
+/**
+ * Fetch AI pipeline trace logs for a specific session.
+ *
+ * Each trace captures what an agent received, decided, why, and what it produced.
+ * Users can only see their own traces (server-side user_id filter).
+ *
+ * @param sessionId - The chat session ID to fetch traces for.
+ * @param limit - Maximum traces to return (default: 10).
+ * @returns Array of trace entries, newest first. Empty array on failure.
+ */
+export async function fetchSessionTraces(sessionId: string, limit: number = 10): Promise<TraceEntry[]> {
+    try {
+        const response = await fetch(
+            `${API_URL}/api/traces/?session_id=${sessionId}&limit=${limit}`,
+            { credentials: 'include' },
+        );
+        if (!response.ok) return [];
+        return await response.json();
+    } catch {
+        return [];
     }
 }
