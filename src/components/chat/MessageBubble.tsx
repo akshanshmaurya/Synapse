@@ -2,7 +2,10 @@ import { motion } from "framer-motion";
 import { Leaf, Volume2, AlertTriangle, RefreshCw, Sparkles, TrendingUp, Activity } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
+import "katex/dist/katex.min.css";
 
 /* ──────────────────────────────────────────────
    Types
@@ -164,7 +167,8 @@ const markdownComponents: Components = {
 
 const MentorMarkdown = ({ content }: { content: string }) => (
     <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         disallowedElements={["html"]}
         unwrapDisallowed
         components={markdownComponents}

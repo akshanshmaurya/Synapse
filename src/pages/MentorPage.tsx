@@ -4,10 +4,8 @@ import { Leaf, Send, Home, MessageSquare, Map, User, BarChart3, LogOut, History,
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendMessage as restSendMessage, streamAudio, fetchChatSessions, fetchChatMessages, deleteChatSession, ChatSession, ChatMessage } from "@/services/api";
-import CognitiveTracePanel from "@/components/CognitiveTracePanel";
 import { useSessionContext } from "@/hooks/useSessionContext";
 import { useMentorSocket, WsConnectionState } from "@/hooks/use-mentor-socket";
-import SessionGoalBanner from "@/components/chat/SessionGoalBanner";
 import MomentumIndicator from "@/components/chat/MomentumIndicator";
 import ActiveConceptsBar from "@/components/chat/ActiveConceptsBar";
 import MessageBubble, { type Reflection } from "@/components/chat/MessageBubble";
@@ -622,31 +620,17 @@ export default function MentorPage() {
                             <div className="h-8 animate-pulse bg-white/10 rounded-lg" />
                         )}
                         {chatId && sessionContext && (
-                            <>
-                                <SessionGoalBanner
-                                    chatId={chatId}
-                                    context={sessionContext}
-                                    onGoalSaved={() => {}}
-                                    onGoalEditing={() => {}}
-                                    saveGoal={saveGoal}
-                                    clearGoal={clearGoal}
-                                    hasConfirmedGoal={hasConfirmedGoal}
-                                    hasInferredGoal={hasInferredGoal}
-                                    isCasualSession={isCasualSession}
-                                    isLearningSession={isLearningSession}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <MomentumIndicator
+                                    momentum={sessionContext.session_momentum ?? null}
+                                    sessionIntent={sessionContext.session_intent ?? null}
+                                    messageCount={sessionContext.message_count ?? 0}
                                 />
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <MomentumIndicator
-                                        momentum={sessionContext.session_momentum ?? null}
-                                        sessionIntent={sessionContext.session_intent ?? null}
-                                        messageCount={sessionContext.message_count ?? 0}
-                                    />
-                                    <ActiveConceptsBar
-                                        activeConcepts={sessionContext.active_concepts ?? []}
-                                        sessionIntent={sessionContext.session_intent ?? null}
-                                    />
-                                </div>
-                            </>
+                                <ActiveConceptsBar
+                                    activeConcepts={sessionContext.active_concepts ?? []}
+                                    sessionIntent={sessionContext.session_intent ?? null}
+                                />
+                            </div>
                         )}
                     </div>
 
@@ -760,8 +744,7 @@ export default function MentorPage() {
                 />
             </div>
 
-            {/* Cognitive Trace Panel */}
-            <CognitiveTracePanel sessionId={chatId} />
+            {/* Cognitive Trace Panel — hidden from users for now */}
 
             {/* ═══ MOBILE BOTTOM NAV ═══ */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-t border-[#E8DED4]/50 px-2 py-2 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
