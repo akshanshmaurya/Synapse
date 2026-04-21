@@ -92,13 +92,12 @@ function SessionSection({
     const momentum = momentumLabels[ctx.session_momentum] ?? momentumLabels.cold_start;
     const MomentumIcon = momentum.icon;
 
-    // Clarity: prefer per-message evaluation score; fall back to session EMA.
-    // If session_clarity is the default 50 AND no evaluation exists, show "—".
+    // Clarity: session_clarity is the authoritative source (updated by evaluator).
+    // latestEvaluation provides delta and trend only (it may have stale pre-evaluator clarity).
     const hasEvaluation = latestEvaluation !== null;
-    const clarityValue = hasEvaluation
-        ? latestEvaluation.clarity_score
-        : ctx.session_clarity;
-    const isFreshDefault = !hasEvaluation && ctx.session_clarity === 50 && ctx.message_count === 0;
+    const rawClarity = ctx.session_clarity;
+    const clarityValue = typeof rawClarity === "number" && !isNaN(rawClarity) ? rawClarity : 50;
+    const isFreshDefault = !hasEvaluation && clarityValue === 50 && (ctx.message_count ?? 0) === 0;
 
     // Delta from evaluation
     const delta = latestEvaluation?.understanding_delta ?? null;
@@ -202,11 +201,16 @@ function SessionSection({
 function ConceptsSection({
     ctx,
     conceptMap,
+    traceConcepts,
 }: {
     ctx: SessionContext | null;
     conceptMap: ConceptMapNode[];
+    traceConcepts: string[];
 }) {
-    const concepts = ctx?.active_concepts ?? [];
+    // Use active_concepts from session context; supplement with evaluator trace concepts
+    const sessionConcepts = ctx?.active_concepts ?? [];
+    const merged = new Set([...sessionConcepts, ...traceConcepts]);
+    const concepts = Array.from(merged);
 
     if (concepts.length === 0) {
         return (
@@ -525,6 +529,33 @@ export default function AIInsightsPanel({
         setTraces([]);
     }, [chatId]);
 
+    // Derive evaluation from Evaluator trace when latestEvaluation isn't set (WS mode)
+    const derivedEvaluation = useMemo(() => {
+        if (latestEvaluation) return latestEvaluation;
+        // Find the latest Evaluator trace for this session
+        const evalTrace = traces.find(t => t.agent === "Evaluator");
+        if (!evalTrace?.details) return null;
+        const d = evalTrace.details as Record<string, unknown>;
+        if (typeof d.clarity_score !== "number") return null;
+        return {
+            clarity_score: d.clarity_score as number,
+            understanding_delta: (d.understanding_delta as number) ?? 0,
+            confusion_trend: (d.confusion_trend as string) ?? "stable",
+            engagement_level: (d.engagement_level as string) ?? "medium",
+        };
+    }, [latestEvaluation, traces]);
+
+    // Extract concepts from Evaluator trace details (supplement for first few messages)
+    const traceConcepts = useMemo(() => {
+        const evalTrace = traces.find(t => t.agent === "Evaluator");
+        if (!evalTrace?.details) return [];
+        const d = evalTrace.details as Record<string, unknown>;
+        if (Array.isArray(d.concepts_discussed)) {
+            return d.concepts_discussed.filter((c): c is string => typeof c === "string");
+        }
+        return [];
+    }, [traces]);
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -568,7 +599,7 @@ export default function AIInsightsPanel({
                                         <h3 className="mono-tag text-[9px] text-[#8B8178] mb-3">This Session</h3>
                                         <SessionSection
                                             ctx={sessionContext}
-                                            latestEvaluation={latestEvaluation}
+                                            latestEvaluation={derivedEvaluation}
                                         />
                                     </section>
 
@@ -577,7 +608,7 @@ export default function AIInsightsPanel({
                                     {/* Section B — Concepts Discussed */}
                                     <section>
                                         <h3 className="mono-tag text-[9px] text-[#8B8178] mb-3">Concepts Discussed</h3>
-                                        <ConceptsSection ctx={sessionContext} conceptMap={conceptMap} />
+                                        <ConceptsSection ctx={sessionContext} conceptMap={conceptMap} traceConcepts={traceConcepts} />
                                     </section>
 
                                     <div className="h-px bg-[#E8DED4]/50" />

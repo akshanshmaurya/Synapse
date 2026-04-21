@@ -142,7 +142,14 @@ export async function fetchChatContext(chatId: string): Promise<SessionContext |
             throw new Error(`Failed to fetch context: ${response.status}`);
         }
 
-        return await response.json();
+        const data = await response.json();
+        // Backend wraps session fields inside data.session (nested response).
+        // Flatten to match the SessionContext interface (flat fields).
+        const session = data.session ?? data;
+        return {
+            ...session,
+            session_id: session.session_id ?? chatId,
+        } as SessionContext;
     } catch (err) {
         // 404 = new chat, context not yet created — that's fine
         if (err instanceof Error && err.message.includes('404')) return null;
