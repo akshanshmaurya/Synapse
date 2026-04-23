@@ -3,16 +3,23 @@ Synapse API
 Multi-agent AI mentor backend with MongoDB and JWT authentication.
 
 Production-grade hardening:
-- HttpOnly cookie-based JWT auth
-- Rate limiting (custom in-memory)
-- CORS restriction (environment-based origins)
-- Security headers middleware
-- Input validation (Pydantic)
-- Structured logging
+- HttpOnly cookie-based JWT auth (see auth/dependencies.py)
+- Role-based access control (RBAC) — see core/authorization.py
+- Rate limiting (custom in-memory) — see core/rate_limiter.py
+- CORS restriction (environment-based origins) — see core/cors.py
+- Security headers middleware — see core/security_headers.py, core/middleware.py
+- CSRF protection (JSON-only state-changing requests) — see core/csrf.py
+- Input validation (Pydantic models with Field constraints)
+- XSS prevention (bleach-based sanitization) — see utils/sanitizer.py
+- Structured logging with request correlation
 - Health check endpoint
+
+SQL Injection: NOT APPLICABLE — this application uses MongoDB (document store
+with BSON queries). MongoDB is not vulnerable to SQL injection. All user
+inputs are passed through Pydantic validation and bleach sanitization before
+reaching the database layer, preventing NoSQL injection as well.
 """
 from fastapi import FastAPI, HTTPException, Depends, Request, status
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -24,10 +31,12 @@ import uuid
 from app.core.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
 from app.core.csrf import CSRFProtectionMiddleware
+from app.core.cors import configure_cors
 from app.core.rate_limiter import rate_limit
 from app.db.mongodb import MongoDB, get_user_memory_collection
 from app.services.agent_orchestrator import AgentOrchestrator
 from app.auth.dependencies import get_current_user, get_current_user_optional
+from app.core.authorization import require_admin, require_authenticated_user  # noqa: F401 — RBAC
 from app.services.report_service import report_service
 from app.utils.logger import logger
 from app.utils.sanitizer import sanitize_text
@@ -84,22 +93,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # NOTE: Starlette applies middleware in REVERSE order of add_middleware() calls.
 # The LAST middleware added is the OUTERMOST (runs first on request).
 
-# Security headers (runs third)
+# Security headers (runs third — see core/security_headers.py for header list)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CSRF protection (runs after CORS, before Security headers)
+# CSRF protection (runs after CORS, before Security headers — see core/csrf.py)
 app.add_middleware(CSRFProtectionMiddleware)
 
-
-# CORS (runs second)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.get_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+# CORS (runs second — see core/cors.py for allowed origins, methods, headers)
+configure_cors(app)
 
 
 

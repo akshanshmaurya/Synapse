@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.auth.dependencies import get_current_user
 from app.db.mongodb import get_user_memory_collection
+from app.utils.sanitizer import sanitize_text  # XSS prevention
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
@@ -70,9 +71,12 @@ async def complete_onboarding(
     user_id = str(current_user["_id"])
     memory_collection = get_user_memory_collection()
 
+    # XSS sanitization: strip HTML from free-text field before storage
+    sanitized_why_here = sanitize_text(data.why_here)
+
     onboarding_doc = {
         "is_complete": True,
-        "why_here": data.why_here,
+        "why_here": sanitized_why_here,
         "guidance_type": data.guidance_type,
         "experience_level": data.experience_level,
         "mentoring_style": data.mentoring_style,

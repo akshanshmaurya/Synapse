@@ -119,12 +119,17 @@ async def update_chat(
     return {"success": True}
 
 
+# Authorization: authenticated user required (ownership verified in chat_service)
 @router.delete("/{chat_id}")
 async def delete_chat_session(
     chat_id: str,
     user: dict = Depends(get_current_user)
 ):
-    """Delete a chat session and all its messages."""
+    """Delete a chat session and all its messages.
+    
+    Authorization: Only the owning user can delete their sessions.
+    Ownership is enforced by passing user_id to chat_service.delete_chat_session.
+    """
     user_id = str(user["_id"])  # Convert ObjectId to string
     
     success = await chat_service.delete_chat_session(

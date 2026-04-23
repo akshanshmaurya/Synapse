@@ -1,35 +1,33 @@
 """
-Security Middleware
-Adds essential security headers to all responses.
+Security Middleware for Synapse API.
+
+Applies HTTP security headers to every response using the centralized
+header definitions from security_headers.py.
+
+Headers include: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection,
+Referrer-Policy, Content-Security-Policy, Permissions-Policy, Cache-Control,
+and Strict-Transport-Security (production only).
+
+See: app/core/security_headers.py for the complete header list and docs.
 """
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from app.core.config import settings
+from app.core.security_headers import get_security_headers
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Adds security headers to every response."""
+    """Injects security headers into every HTTP response.
+
+    Uses the centralized header definitions from security_headers.py
+    so all security headers are documented and configurable in one place.
+    """
 
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
 
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "connect-src 'self' https://generativelanguage.googleapis.com https://api.elevenlabs.io; "
-            "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "frame-ancestors 'none';"
-        )
-
-        if settings.ENVIRONMENT == "production":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+        # Apply all security headers from the centralized configuration
+        for header_name, header_value in get_security_headers().items():
+            response.headers[header_name] = header_value
 
         return response
