@@ -1,6 +1,14 @@
 """
-MongoDB Connection Module
-Uses Motor for async MongoDB operations
+MongoDB Database Layer for Synapse.
+
+SECURITY NOTE — SQL Injection: Synapse uses MongoDB (NoSQL), which is not
+susceptible to SQL injection attacks. All database operations use the Motor
+async driver with parameterized queries and Pydantic v2 model validation,
+which provides structural protection against NoSQL injection.
+
+Input validation: All user inputs are validated by Pydantic models before
+reaching database operations. User-provided text is additionally sanitized
+by app.utils.sanitizer before storage.
 """
 import asyncio
 import sys

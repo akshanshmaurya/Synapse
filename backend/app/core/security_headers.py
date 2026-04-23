@@ -14,6 +14,7 @@ Headers applied:
     - Permissions-Policy                        — Restricts browser features
     - Cache-Control (API responses)             — Prevents sensitive data caching
 
+OWASP Top 10 compliance: A05:2021 (Security Misconfiguration)
 Reference: https://owasp.org/www-project-secure-headers/
 See also: app/core/middleware.py (where these are applied).
 """

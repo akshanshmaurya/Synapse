@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.services.chat_service import chat_service
+from app.utils.sanitizer import sanitize_text  # XSS prevention
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -108,7 +109,9 @@ async def update_chat(
     user: dict = Depends(get_current_user)
 ):
     """Update a chat session's title."""
-    success = await chat_service.update_chat_title(chat_id, request.title)
+    # XSS sanitization: strip HTML from title before storage
+    sanitized_title = sanitize_text(request.title)
+    success = await chat_service.update_chat_title(chat_id, sanitized_title)
     
     if not success:
         raise HTTPException(

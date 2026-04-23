@@ -623,6 +623,10 @@ async def update_user_profile(
     user_id = str(current_user["_id"])
     memory = MemoryAgent()
 
-    await memory.update_profile(user_id, interests=interests, goals=goals)
+    # XSS sanitization: strip HTML from user-provided list items
+    sanitized_interests = [sanitize_text(i) for i in interests] if interests else interests
+    sanitized_goals = [sanitize_text(g) for g in goals] if goals else goals
+
+    await memory.update_profile(user_id, interests=sanitized_interests, goals=sanitized_goals)
 
     return {"success": True, "message": "Profile updated"}

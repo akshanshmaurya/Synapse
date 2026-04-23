@@ -1,14 +1,18 @@
 """
-Security Middleware for Synapse API.
+Security Headers Middleware for Synapse API.
 
-Applies HTTP security headers to every response using the centralized
-header definitions from security_headers.py.
+Sets the following HTTP security headers on every response:
+- Content-Security-Policy (CSP): restricts resource loading to same origin
+- Strict-Transport-Security (HSTS): enforces HTTPS in production
+- X-Frame-Options: DENY — prevents clickjacking
+- X-Content-Type-Options: nosniff — prevents MIME sniffing
+- X-XSS-Protection: 1; mode=block — legacy XSS protection for older browsers
+- Referrer-Policy: no-referrer — prevents referrer leakage
+- Permissions-Policy: disables camera, microphone, geolocation, payment
+- Cache-Control: no-store — prevents sensitive data caching
 
-Headers include: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection,
-Referrer-Policy, Content-Security-Policy, Permissions-Policy, Cache-Control,
-and Strict-Transport-Security (production only).
-
-See: app/core/security_headers.py for the complete header list and docs.
+OWASP Top 10 compliance: A05:2021 (Security Misconfiguration)
+See: app/core/security_headers.py for the complete header definitions.
 """
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
