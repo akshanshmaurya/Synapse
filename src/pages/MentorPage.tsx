@@ -109,8 +109,6 @@ export default function MentorPage() {
     }, []);
 
     // ── WebSocket streaming state ─────────────────────────────────
-    const streamingContentRef = useRef("");
-    const streamingBubbleIdRef = useRef<string | null>(null);
     const pendingUserMessageRef = useRef<string>("");
 
     // Session context (Phase 6.1)
@@ -131,52 +129,18 @@ export default function MentorPage() {
         // Typing indicator is already shown via isReflecting
     }, []);
 
-    const handleWsToken = useCallback((token: string) => {
-        // First token arrives — replace typing indicator with a streaming bubble
-        if (!streamingBubbleIdRef.current) {
-            const bubbleId = `ws-stream-${Date.now()}`;
-            streamingBubbleIdRef.current = bubbleId;
-            streamingContentRef.current = token;
-            setIsReflecting(false);
-            setReflections(prev => [...prev, {
-                id: bubbleId,
-                type: "guidance",
-                content: token,
-                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-            }]);
-        } else {
-            // Append subsequent tokens
-            streamingContentRef.current += token;
-            const currentContent = streamingContentRef.current;
-            const currentId = streamingBubbleIdRef.current;
-            setReflections(prev => prev.map(r =>
-                r.id === currentId ? { ...r, content: currentContent } : r
-            ));
-        }
+    const handleWsToken = useCallback(() => {
+        setIsReflecting(false);
     }, []);
 
     const handleWsDone = useCallback((content: string, wsChatId: string) => {
-        const currentId = streamingBubbleIdRef.current;
-        // Finalize the streaming bubble with authoritative full text
-        if (currentId) {
-            setReflections(prev => prev.map(r =>
-                r.id === currentId ? { ...r, content } : r
-            ));
-        } else {
-            // Edge case: done arrived without any tokens (very fast response)
-            setIsReflecting(false);
-            setReflections(prev => [...prev, {
-                id: `ws-done-${Date.now()}`,
-                type: "guidance",
-                content,
-                timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-            }]);
-        }
-
-        // Reset streaming state
-        streamingBubbleIdRef.current = null;
-        streamingContentRef.current = "";
         setIsReflecting(false);
+        setReflections(prev => [...prev, {
+            id: `ws-done-${Date.now()}`,
+            type: "guidance",
+            content,
+            timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+        }]);
 
         // Set chatId if this was a new conversation
         if (wsChatId && !chatId) {
@@ -200,8 +164,6 @@ export default function MentorPage() {
     }, [chatId, refreshSessionContext]);
 
     const handleWsError = useCallback((message: string) => {
-        streamingBubbleIdRef.current = null;
-        streamingContentRef.current = "";
         setIsReflecting(false);
 
         const errorId = `ws-err-${Date.now()}`;
@@ -214,7 +176,7 @@ export default function MentorPage() {
     }, []);
 
     // ── Wire up WebSocket ──────────────────────────────────────────
-    const { connectionState: wsState, sendMessage: wsSendMessage } = useMentorSocket({
+    const { connectionState: wsState, isStreaming, streamingContent, sendMessage: wsSendMessage } = useMentorSocket({
         sessionId: chatId ?? "new",
         onToken: handleWsToken,
         onDone: handleWsDone,
@@ -231,7 +193,7 @@ export default function MentorPage() {
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [reflections, isReflecting]);
+    }, [reflections, isReflecting, streamingContent]);
 
     useEffect(() => {
         if (showHistory) {
@@ -258,8 +220,6 @@ export default function MentorPage() {
             content: "Welcome to this quiet space. I've been reflecting on your journey — the seeds you've planted, the growth you've nurtured.\n\nWhat's stirring in your mind today? There's no rush to answer. Take your time.",
             timestamp: "Just now"
         }]);
-        streamingBubbleIdRef.current = null;
-        streamingContentRef.current = "";
         setInput("");
         setIsReflecting(false);
         setShowHistory(false);
@@ -317,10 +277,6 @@ export default function MentorPage() {
         setReflections(prev => [...prev, thought]);
         setInput("");
         setIsReflecting(true);
-
-        // Reset streaming state for this new message
-        streamingBubbleIdRef.current = null;
-        streamingContentRef.current = "";
 
         // ── Try WebSocket first (primary transport) ─────────────────
         // The hook connects to "new" when chatId is null — the backend
@@ -628,6 +584,20 @@ export default function MentorPage() {
                                 ))}
                             </AnimatePresence>
 
+                            {/* Streamed content bubble */}
+                            {isStreaming && streamingContent && (
+                                <MessageBubble
+                                    reflection={{
+                                        id: "streaming-bubble",
+                                        type: "guidance",
+                                        content: streamingContent,
+                                        timestamp: "Just now"
+                                    }}
+                                    animationDelay={0}
+                                    ease={[...ease]}
+                                />
+                            )}
+
                             {/* Thinking indicator */}
                             {isReflecting && (
                                 <motion.div
@@ -695,9 +665,9 @@ export default function MentorPage() {
                                     </span>
                                     <button
                                         onClick={handleSubmit}
-                                        disabled={!input.trim() || isReflecting}
+                                        disabled={!input.trim() || isReflecting || isStreaming}
                                         className={`group flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-500 ${
-                                            input.trim() && !isReflecting
+                                            input.trim() && !isReflecting && !isStreaming
                                                 ? "bg-[#5C6B4A] text-white hover:bg-[#4A5A3A] hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(92,107,74,0.2)]"
                                                 : "bg-[#E8DED4]/50 text-[#8B8178]/40 cursor-not-allowed"
                                         }`}

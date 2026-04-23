@@ -48,6 +48,8 @@ export function useMentorSocket({
     const [connectionState, setConnectionState] = useState<WsConnectionState>(
         WsConnectionState.IDLE
     );
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [streamingContent, setStreamingContent] = useState("");
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const backoffRef = useRef(INITIAL_BACKOFF_MS);
     const reconnectAttemptsRef = useRef(0);
@@ -105,12 +107,19 @@ export function useMentorSocket({
                     wslog("msg", data.type, data.type === "token" ? JSON.stringify(data.content).slice(0, 40) : "");
                     switch (data.type) {
                         case "token":
+                            setIsStreaming(true);
+                            setStreamingContent((prev) => prev + data.content);
                             onTokenRef.current?.(data.content);
                             break;
                         case "done":
+                            setIsStreaming(false);
                             onDoneRef.current?.(data.content, data.chat_id);
+                            // Keep content for a tick so UI can transition, then clear
+                            setTimeout(() => setStreamingContent(""), 50);
                             break;
                         case "error":
+                            setIsStreaming(false);
+                            setStreamingContent("");
                             onErrorRef.current?.(data.content);
                             break;
                         case "typing":
@@ -180,6 +189,8 @@ export function useMentorSocket({
             const rs = wsRef.current?.readyState;
             if (rs === WebSocket.OPEN) {
                 wslog("send via WS", JSON.stringify(message).slice(0, 60));
+                setStreamingContent("");
+                setIsStreaming(true);
                 wsRef.current!.send(JSON.stringify({ message }));
                 return true;
             }
@@ -197,7 +208,9 @@ export function useMentorSocket({
             wsRef.current.close();
         }
         setConnectionState(WsConnectionState.CLOSED);
+        setIsStreaming(false);
+        setStreamingContent("");
     }, []);
 
-    return { connectionState, sendMessage, disconnect };
+    return { connectionState, isStreaming, streamingContent, sendMessage, disconnect };
 }
