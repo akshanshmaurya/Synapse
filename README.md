@@ -9,8 +9,8 @@
     <a href="https://github.com/akshanshmaurya/Synapse/actions/workflows/ci.yml">
       <img src="https://github.com/akshanshmaurya/Synapse/actions/workflows/ci.yml/badge.svg" alt="CI" />
     </a>
-    <img src="https://img.shields.io/badge/Tests-154_passing-brightgreen" alt="Tests" />
-    <img src="https://img.shields.io/badge/Coverage-improving-yellow" alt="Coverage" />
+    <img src="https://img.shields.io/badge/Tests-169_passing-brightgreen" alt="Tests" />
+    <img src="https://img.shields.io/badge/Coverage-52%25-yellow" alt="Coverage" />
   </p>
 
   <p>
@@ -305,7 +305,7 @@ Synapse/
 │   │   ├── db/
 │   │   │   └── mongodb.py              # Motor client, connection retry, index creation
 │   │   └── main.py                      # FastAPI app, lifespan, CORS
-│   ├── tests/                           # 73 backend tests across 17 test files
+│   ├── tests/                           # 169 backend tests across 18 test files
 │   ├── Dockerfile                       # Multi-stage build with health check
 │   └── requirements.txt
 ├── src/
@@ -429,8 +429,10 @@ npm run dev
 
 ## Testing
 
+See [backend/TESTING.md](backend/TESTING.md) for the full test suite documentation, including per-module coverage and testing philosophy.
+
 ```bash
-# Backend tests (73 tests, < 5 seconds)
+# Backend tests (169 tests, < 4 minutes)
 cd backend
 pytest -q
 

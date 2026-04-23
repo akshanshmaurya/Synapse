@@ -334,6 +334,37 @@ All collections use async indexes created on application startup.
 
 ---
 
+## Test Coverage Summary
+
+169 automated tests across 18 test files. Coverage: 52% (3,563 statements).
+See [`backend/TESTING.md`](../backend/TESTING.md) for the complete test suite documentation.
+
+| Module | Test File | Tests | Coverage |
+|--------|-----------|-------|----------|
+| Agent Pipeline (full chain) | `test_agents_pipeline.py` | 15 | — |
+| Orchestrator V2 | `test_orchestrator_v2.py` | 8 | 73% |
+| Evaluator Logic | `test_evaluator_logic.py` | 7 | 43% |
+| Evaluator ↔ Memory | `test_evaluator_memory.py` | 10 | 43% |
+| Memory Agent V2 | `test_memory_agent_v2.py` | 7 | 45% |
+| Session Context Service | `test_session_context_service.py` | 18 | 92% |
+| Concept Memory Service | `test_concept_memory_service.py` | 18 | 66% |
+| Profile Service | `test_profile_service.py` | 7 | 92% |
+| Intent + Goal Services | `test_intent_goal_services.py` | 8 | 80% |
+| Analytics | `test_analytics.py` | 8 | 74% |
+| Auth (register/login) | `test_auth.py` | 10 | 36% |
+| JWT Handler | `test_jwt.py` | 15 | 97% |
+| Password Hashing | `test_password.py` | 7 | 100% |
+| API Endpoints | `test_api_endpoints.py` | 10 | 35% |
+| Chat History Routes | `test_chat_history_routes.py` | 2 | 42% |
+| WebSocket | `test_websocket.py` | 6 | 72% |
+| Rate Limiter | `test_rate_limiter.py` | 5 | 97% |
+| Error Handling | `test_errors.py` | 8 | — |
+
+**Total:** 169 tests · 52% coverage · 18 test files
+**CI:** GitHub Actions runs full suite on every push to `main` and `dev`
+
+---
+
 ## Key Design Principles
 
 1. **Deterministic over probabilistic** — Rules fire before LLM, not after
