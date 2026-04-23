@@ -614,26 +614,6 @@ export default function MentorPage() {
                         )}
                     </AnimatePresence>
 
-                    {/* ──── Session Context UI (Phase 6.1) ──── */}
-                    <div className="max-w-3xl mx-auto px-6 md:px-10 pt-3 space-y-1.5">
-                        {sessionContextLoading && !sessionContext && (
-                            <div className="h-8 animate-pulse bg-white/10 rounded-lg" />
-                        )}
-                        {chatId && sessionContext && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <MomentumIndicator
-                                    momentum={sessionContext.session_momentum ?? null}
-                                    sessionIntent={sessionContext.session_intent ?? null}
-                                    messageCount={sessionContext.message_count ?? 0}
-                                />
-                                <ActiveConceptsBar
-                                    activeConcepts={sessionContext.active_concepts ?? []}
-                                    sessionIntent={sessionContext.session_intent ?? null}
-                                />
-                            </div>
-                        )}
-                    </div>
-
                     {/* ──── Chat / Reflections Area ──── */}
                     <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8">
                         <div className="max-w-3xl mx-auto space-y-6">

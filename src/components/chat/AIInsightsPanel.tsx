@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Brain, Target, Zap, MessageCircle, TrendingUp, TrendingDown, Minus,
@@ -99,6 +99,12 @@ function SessionSection({
     const clarityValue = typeof rawClarity === "number" && !isNaN(rawClarity) ? rawClarity : 50;
     const isFreshDefault = !hasEvaluation && clarityValue === 50 && (ctx.message_count ?? 0) === 0;
 
+    // Track previous clarity so the bar animates from old → new (not 0 → new)
+    const prevClarityRef = useRef(clarityValue);
+    useEffect(() => {
+        prevClarityRef.current = clarityValue;
+    }, [clarityValue]);
+
     // Delta from evaluation
     const delta = latestEvaluation?.understanding_delta ?? null;
     const deltaColor = delta !== null
@@ -164,7 +170,7 @@ function SessionSection({
                     <div className="h-1.5 rounded-full bg-[#E8DED4]/50 overflow-hidden">
                         <motion.div
                             className="h-full rounded-full"
-                            initial={{ width: 0 }}
+                            initial={{ width: `${prevClarityRef.current}%` }}
                             animate={{ width: `${clarityValue}%` }}
                             transition={{ duration: 0.8, ease }}
                             style={{
@@ -173,6 +179,7 @@ function SessionSection({
                                     : clarityValue > 40
                                     ? "linear-gradient(90deg, #D4A574, #E8C49A)"
                                     : "linear-gradient(90deg, #C45C5C, #D47A7A)",
+                                transition: "width 0.8s cubic-bezier(0.23, 1, 0.32, 1)",
                             }}
                         />
                     </div>
