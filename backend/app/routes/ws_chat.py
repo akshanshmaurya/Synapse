@@ -72,6 +72,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 chat_id = session_id if session_id != "new" else None
 
                 async def _send_token(chunk: str):
+                    """Internal helper."""
                     await websocket.send_json({
                         "type": "token",
                         "content": chunk,

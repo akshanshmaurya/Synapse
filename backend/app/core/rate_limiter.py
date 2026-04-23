@@ -25,6 +25,7 @@ class RateLimiter:
 
     def __init__(self):
         # { "key": [(timestamp, ...)] }
+        """Internal helper."""
         self._requests: dict[str, list[float]] = defaultdict(list)
 
     def _clean_old_entries(self, key: str, window_seconds: int):
@@ -75,6 +76,7 @@ def rate_limit(max_requests: int, window_seconds: int = 60, prefix: str = ""):
             ...
     """
     async def _rate_limit_check(request: Request):
+        """Internal helper."""
         ip = get_client_ip(request)
         key = f"{prefix}:{ip}" if prefix else ip
 

@@ -166,6 +166,7 @@ class MongoDB:
             logger.error("Failed to create database indexes: %s", e)
 
 def get_database():
+    """Internal helper."""
     return MongoDB.get_db()
 
 
@@ -176,24 +177,31 @@ def get_collection(name: str):
 
 # Collections
 def get_users_collection():
+    """Internal helper."""
     return MongoDB.get_db()["users"]
 
 def get_sessions_collection():
+    """Internal helper."""
     return MongoDB.get_db()["sessions"]
 
 def get_user_memory_collection():
+    """Internal helper."""
     return MongoDB.get_db()["user_memory"]
 
 def get_interactions_collection():
+    """Internal helper."""
     return MongoDB.get_db()["interactions"]
 
 def get_roadmaps_collection():
+    """Internal helper."""
     return MongoDB.get_db()["roadmaps"]
 
 def get_roadmap_feedback_collection():
+    """Internal helper."""
     return MongoDB.get_db()["roadmap_feedback"]
 
 def get_agent_logs_collection():
+    """Internal helper."""
     return MongoDB.get_db()["agent_logs"]
 
 # NEW: Chat history collections (separate from memory)

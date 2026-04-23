@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 class CSRFProtectionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Only enforce on state-changing methods
+        """Internal helper."""
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             # Check for allowed Content-Types
             # Note: We must allow multipart/form-data if we have file uploads, but presently we don't.

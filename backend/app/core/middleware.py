@@ -28,6 +28,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
+        """Internal helper."""
         response: Response = await call_next(request)
 
         # Apply all security headers from the centralized configuration

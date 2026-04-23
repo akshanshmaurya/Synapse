@@ -54,7 +54,20 @@ async def create_chat_session(
     request: CreateChatRequest,
     user: dict = Depends(get_current_user)
 ):
-    """Create a new chat session."""
+    """
+    Create a new chat session.
+
+    Args:
+        request: CreateChatRequest containing an optional title.
+        user: The authenticated user dictionary.
+
+    Returns:
+        JSON with the new 'chat_id' and 'title'.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        422: If request validation fails.
+    """
     user_id = str(user["_id"])  # Convert ObjectId to string
     
     chat_id = await chat_service.create_chat_session(
@@ -108,7 +121,22 @@ async def update_chat(
     request: UpdateChatRequest,
     user: dict = Depends(get_current_user)
 ):
-    """Update a chat session's title."""
+    """
+    Update a chat session's title.
+
+    Args:
+        chat_id: The unique ID of the chat session.
+        request: UpdateChatRequest containing the new title.
+        user: The authenticated user dictionary.
+
+    Returns:
+        JSON object with success status.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        404: If chat session does not exist.
+        422: If request validation fails.
+    """
     # XSS sanitization: strip HTML from title before storage
     sanitized_title = sanitize_text(request.title)
     success = await chat_service.update_chat_title(chat_id, sanitized_title)

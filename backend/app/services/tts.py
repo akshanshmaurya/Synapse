@@ -9,6 +9,7 @@ ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 VOICE_ID = "21m00Tcm4TlvDq8ikWAM" 
 
 def generate_audio(text: str) -> bytes:
+    """Internal helper."""
     api_key = settings.ELEVENLABS_API_KEY
     if not api_key:
         logger.warning("ELEVENLABS_API_KEY not set")

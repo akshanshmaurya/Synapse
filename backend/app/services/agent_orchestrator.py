@@ -42,6 +42,7 @@ from app.utils.logger import logger
 
 class AgentOrchestrator:
     def __init__(self):
+        """Internal helper."""
         self.memory_agent = MemoryAgent()
         self.planner_agent = PlannerAgent()
         self.executor_agent = ExecutorAgent()
@@ -543,6 +544,7 @@ class AgentOrchestrator:
 
     async def _run_evaluator_background(self, message, response, user_context,
                                          session_context, user_id, chat_id, request_id, strategy):
+        """Internal helper."""
         try:
             # ── Struggle detection ─────────────────────────────
             struggle_check = self.evaluator_agent.detect_struggle(message)
@@ -606,6 +608,7 @@ class AgentOrchestrator:
 
     async def _run_profile_signal_update(self, message, session_history,
                                           user_id, session_context):
+        """Internal helper."""
         try:
             recent_messages = session_history[-3:] if session_history else []
             signals = intent_classifier_service.extract_profile_signals(

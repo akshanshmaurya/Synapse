@@ -16,6 +16,7 @@ from app.db.mongodb import get_database  # type: ignore
 
 class TraceService:
     def __init__(self):
+        """Internal helper."""
         pass
 
     async def add_trace(

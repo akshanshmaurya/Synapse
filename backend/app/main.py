@@ -46,6 +46,7 @@ from app.utils.sanitizer import sanitize_text
 # --- Lifespan ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Internal helper."""
     try:
         await MongoDB.connect()
     except Exception as e:
@@ -60,6 +61,7 @@ app = FastAPI(title="Synapse API", lifespan=lifespan)
 # --- Global Exception Handlers ---
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    """Internal helper."""
     logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,
@@ -70,6 +72,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def http_exception_handler(request: Request, exc: HTTPException):
     # Standardize HTTP exceptions
     # Some built-in fastAPI exceptions don't have code, so we derive one from status
+    """Internal helper."""
     code_map = {
         status.HTTP_400_BAD_REQUEST: "BAD_REQUEST",
         status.HTTP_401_UNAUTHORIZED: "UNAUTHORIZED",
@@ -85,6 +88,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Internal helper."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"error": True, "code": "VALIDATION_ERROR", "message": str(exc.errors())},
@@ -182,7 +186,12 @@ async def check_onboarding_complete(user_id: str) -> bool:
 
 @app.get("/health")
 async def health_check():
-    """Health check with MongoDB connection status."""
+    """
+    Returns the health status of the API and its database connection.
+
+    Returns:
+        JSON with 'status' (healthy/degraded), 'database' state, and 'environment'.
+    """
     db_status = "connected" if MongoDB.db is not None else "disconnected"
     if MongoDB.db is not None:
         try:
@@ -201,6 +210,12 @@ async def health_check():
 
 @app.get("/")
 def read_root():
+    """
+    Returns a basic root message indicating the API is running.
+
+    Returns:
+        JSON message with API version.
+    """
     return {"message": "Synapse Backend is running", "version": "2.0"}
 
 
@@ -214,8 +229,20 @@ async def chat_endpoint(
     _rate=Depends(rate_limit(30, 60, "chat")),
 ):
     """
-    Main chat endpoint — rate limited to 30/min.
-    Requires authentication and onboarding completion.
+    Process a user message through the mentor agent pipeline.
+
+    Args:
+        request: The FastAPI Request object.
+        body: ChatRequest containing the message, optional chat_id, and optional session_goal.
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        ChatResponse containing the mentor's reply, chat ID, and evaluation metrics.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        422: If request validation fails.
+        429: If rate limit (30/min) is exceeded.
     """
     user_id = str(current_user["_id"])
 
@@ -264,7 +291,21 @@ async def chat_guest_endpoint(
     guest_id: str = None,
     _rate=Depends(rate_limit(10, 60, "guest_chat")),
 ):
-    """Guest chat — rate limited to 10/min, no auth required."""
+    """
+    Process a guest message with strict rate limits and no memory retention.
+
+    Args:
+        request: The FastAPI Request object.
+        body: ChatRequest containing the message.
+        guest_id: Optional string guest identifier.
+
+    Returns:
+        ChatResponse containing the mentor's reply.
+
+    Raises:
+        422: If request validation fails.
+        429: If rate limit (10/min) is exceeded.
+    """
     try:
         user_id = guest_id or f"guest_{uuid.uuid4().hex}"
         sanitized_message = sanitize_text(body.message)
@@ -281,7 +322,22 @@ async def get_session_context(
     chat_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Fetch the full session context for a chat — used by Session Context UI."""
+    """
+    Fetch the full session context for a specific chat.
+
+    Args:
+        chat_id: The unique ID of the chat session.
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object containing session goal, intent, momentum, and active concepts.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        403: If user lacks access to this chat.
+        404: If chat session does not exist.
+        422: If request validation fails.
+    """
     from bson import ObjectId
     from app.db.mongodb import get_chats_collection
     from app.services.session_context_service import session_context_service
@@ -310,7 +366,23 @@ async def update_session_goal(
     request_body: GoalUpdateRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Allow user to manually set or confirm the inferred goal."""
+    """
+    Update the inferred or explicit learning goal for a session.
+
+    Args:
+        chat_id: The unique ID of the chat session.
+        request_body: GoalUpdateRequest containing the new goal and confirmation status.
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object indicating success, the updated goal, and confirmation state.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        403: If user lacks access to this chat.
+        404: If chat session does not exist.
+        422: If request validation fails.
+    """
     from bson import ObjectId
     from app.db.mongodb import get_chats_collection
     from app.services.session_context_service import session_context_service
@@ -348,7 +420,19 @@ async def update_session_goal(
 
 @app.post("/api/tts")
 async def tts_endpoint(request: TTSRequest):
-    """Text-to-speech endpoint."""
+    """
+    Convert text to speech using the TTS engine.
+
+    Args:
+        request: TTSRequest containing the text to synthesize.
+
+    Returns:
+        Audio response containing the MPEG audio stream.
+
+    Raises:
+        422: If request validation fails.
+        500: If audio generation fails.
+    """
     from app.services.tts import generate_audio
 
     audio_content = generate_audio(request.text)
@@ -364,7 +448,18 @@ async def tts_endpoint(request: TTSRequest):
 
 @app.get("/api/user/concept-map")
 async def get_concept_map(current_user: dict = Depends(get_current_user)):
-    """Return all user concepts as nodes and inferred prerequisite edges for graph visualization."""
+    """
+    Return the user's concept map data including nodes and prerequisite edges.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object containing 'nodes' (concepts) and 'edges' (prerequisites).
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     from app.services.concept_memory_service import concept_memory_service
 
     user_id = str(current_user["_id"])
@@ -419,7 +514,18 @@ async def get_concept_map(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/recommendations")
 async def get_zpd_recommendations(current_user: dict = Depends(get_current_user)):
-    """Return ZPD recommendations, learning velocity, and recent session history."""
+    """
+    Return personalized ZPD recommendations and learning velocity metrics.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object containing 'next_steps', 'velocity', and 'recent_sessions'.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     from app.services.concept_memory_service import concept_memory_service
     from app.db.mongodb import get_chats_collection, get_session_contexts_collection
     from datetime import datetime, timedelta
@@ -566,7 +672,18 @@ async def get_zpd_recommendations(current_user: dict = Depends(get_current_user)
 
 @app.get("/api/user/me")
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    """Get current authenticated user's info including onboarding status."""
+    """
+    Get the currently authenticated user's account information and onboarding status.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object with user ID, email, name, creation date, and onboarding completion flag.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     from datetime import datetime
 
     user_id = str(current_user["_id"])
@@ -583,7 +700,18 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/memory")
 async def get_user_memory(current_user: dict = Depends(get_current_user)):
-    """Get current user's memory/profile data."""
+    """
+    Retrieve the current user's legacy profile/memory data.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object containing the user's memory document.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     user_id = str(current_user["_id"])
     memory_collection = get_user_memory_collection()
     memory = await memory_collection.find_one({"user_id": user_id})
@@ -595,7 +723,18 @@ async def get_user_memory(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/dashboard")
 async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
-    """Get derived dashboard insights for the user."""
+    """
+    Aggregate and return dashboard insights for the authenticated user.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object with momentum state, effort metrics, and recent signals.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     from app.services.dashboard_service import DashboardService
 
     user_id = str(current_user["_id"])
@@ -606,7 +745,18 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/report")
 async def get_learning_report(current_user: dict = Depends(get_current_user)):
-    """Return a comprehensive learning outcome report for the user."""
+    """
+    Generate a comprehensive learning outcome report for the user.
+
+    Args:
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object containing profile stats, concept mastery, and learning pace.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+    """
     user_id = str(current_user["_id"])
     return await report_service.generate_report(user_id)
 
@@ -617,7 +767,21 @@ async def update_user_profile(
     goals: list = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update user profile."""
+    """
+    Update the user's interests and goals in their profile.
+
+    Args:
+        interests: Optional list of interest tags.
+        goals: Optional list of goal strings.
+        current_user: The authenticated user dictionary.
+
+    Returns:
+        JSON object indicating success and a confirmation message.
+
+    Raises:
+        401: If authentication token is missing or invalid.
+        422: If request validation fails.
+    """
     from app.agents.memory_agent import MemoryAgent
 
     user_id = str(current_user["_id"])

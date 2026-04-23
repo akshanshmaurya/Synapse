@@ -14,6 +14,7 @@ from app.utils.logger import logger
 
 class ExecutorAgent:
     def __init__(self):
+        """Internal helper."""
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     def _build_response_prompt(

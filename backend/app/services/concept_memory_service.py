@@ -159,10 +159,12 @@ def slugify_concept(name: str) -> str:
 
 
 def _prettify_concept_name(slug: str) -> str:
+    """Internal helper."""
     return " ".join(part.upper() if len(part) <= 3 else part.capitalize() for part in slug.split("-"))
 
 
 def _normalize_candidate(name: str) -> tuple[str, str]:
+    """Internal helper."""
     cleaned = name.strip().strip(".,:;!?")
     cleaned = cleaned.replace("&", " and ")
     cleaned = cleaned.replace("/", " ")
@@ -185,6 +187,7 @@ def _normalize_candidate(name: str) -> tuple[str, str]:
 
 
 def _looks_like_supported_concept(name: str, slug: str, session_domain: Optional[str]) -> bool:
+    """Internal helper."""
     if not slug or slug in _REJECTED_CONCEPT_SLUGS:
         return False
     if slug.split("-")[0] in _REJECTED_CONCEPT_SLUGS:
@@ -205,6 +208,7 @@ def _looks_like_supported_concept(name: str, slug: str, session_domain: Optional
 
 
 def _resolve_concept_domain(name: str, slug: str, session_domain: Optional[str]) -> Optional[str]:
+    """Internal helper."""
     if slug in PREREQUISITE_GRAPH:
         return PREREQUISITE_GRAPH[slug]["domain"]
     if slug in _CANONICAL_TECH_CONCEPTS:

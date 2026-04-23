@@ -11,10 +11,12 @@ class PyObjectId(str):
     """Custom type for MongoDB ObjectId"""
     @classmethod
     def __get_validators__(cls):
+        """Internal helper."""
         yield cls.validate
 
     @classmethod
     def validate(cls, v, handler):
+        """Internal helper."""
         if isinstance(v, ObjectId):
             return str(v)
         if isinstance(v, str) and ObjectId.is_valid(v):

@@ -150,6 +150,7 @@ def compute_deterministic_strategy(context: Dict[str, Any]) -> Optional[Dict[str
 
 class PlannerAgent:
     def __init__(self):
+        """Internal helper."""
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     # =========================================================================

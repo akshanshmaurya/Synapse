@@ -72,6 +72,7 @@ def require_role(required_role: str):
     Usage: Depends(require_role("admin"))
     """
     async def role_checker(current_user: dict = Depends(get_current_user)):
+        """Internal helper."""
         user_role = current_user.get("role", "user")
         if user_role != required_role:
             logger.warning(

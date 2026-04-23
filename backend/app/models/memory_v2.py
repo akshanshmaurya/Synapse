@@ -97,6 +97,7 @@ class UserProfileV2(BaseModel):
     @field_validator("experience_level")
     @classmethod
     def validate_experience_level(cls, v: str) -> str:
+        """Internal helper."""
         allowed = {"absolute_beginner", "beginner", "intermediate", "advanced"}
         if v not in allowed:
             raise ValueError(f"experience_level must be one of {allowed}")
@@ -105,6 +106,7 @@ class UserProfileV2(BaseModel):
     @field_validator("preferred_learning_style")
     @classmethod
     def validate_learning_style(cls, v: str) -> str:
+        """Internal helper."""
         allowed = {"visual", "conceptual", "hands_on", "mixed"}
         if v not in allowed:
             raise ValueError(f"preferred_learning_style must be one of {allowed}")
@@ -113,6 +115,7 @@ class UserProfileV2(BaseModel):
     @field_validator("mentoring_tone")
     @classmethod
     def validate_mentoring_tone(cls, v: str) -> str:
+        """Internal helper."""
         allowed = {"supportive", "challenging", "balanced"}
         if v not in allowed:
             raise ValueError(f"mentoring_tone must be one of {allowed}")
@@ -183,6 +186,7 @@ class ConceptRecord(BaseModel):
     @field_validator("mastery_level")
     @classmethod
     def validate_mastery(cls, v: float) -> float:
+        """Internal helper."""
         if v < 0.0 or v > 1.0:
             raise ValueError(f"mastery_level must be between 0.0 and 1.0, got {v}")
         return v
@@ -256,6 +260,7 @@ class SessionContext(BaseModel):
     @field_validator("session_intent")
     @classmethod
     def validate_session_intent(cls, v: str) -> str:
+        """Internal helper."""
         allowed = {"unknown", "learning", "problem_solving", "casual", "review"}
         if v not in allowed:
             raise ValueError(f"session_intent must be one of {allowed}")
@@ -307,11 +312,13 @@ class SessionContext(BaseModel):
     @field_validator("session_clarity")
     @classmethod
     def clamp_clarity(cls, v: float) -> float:
+        """Internal helper."""
         return max(0.0, min(100.0, v))
 
     @field_validator("session_momentum")
     @classmethod
     def validate_momentum(cls, v: str) -> str:
+        """Internal helper."""
         allowed = {"cold_start", "warming_up", "flowing", "stuck", "wrapping_up"}
         if v not in allowed:
             raise ValueError(f"session_momentum must be one of {allowed}")
