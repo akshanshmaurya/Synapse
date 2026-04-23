@@ -12,8 +12,6 @@ from fastapi import APIRouter, Depends, Query  # type: ignore
 from typing import List, Dict, Any
 from app.services.trace_service import trace_service  # type: ignore
 from app.auth.dependencies import get_current_user  # type: ignore
-# Authorization: admin role available for production lockdown
-from app.core.authorization import require_admin  # noqa: F401 — RBAC ready
 
 router = APIRouter(prefix="/api/traces", tags=["system-traces"])
 
@@ -30,7 +28,8 @@ async def get_traces(
     
     Authorization: Authenticated users only. Each user can only retrieve
     their own traces — the user_id filter ensures data isolation.
-    For admin access to all traces, use Depends(require_admin).
+    For admin access to all traces, use Depends(require_admin) from
+    app.core.authorization.
     
     Limit raised to 30 (was 20) so the full pipeline per message is visible.
     """

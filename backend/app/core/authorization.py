@@ -24,26 +24,11 @@ Usage:
     async def user_route(user=Depends(require_authenticated_user)):
         ...
 """
-from fastapi import Depends
 from app.auth.dependencies import require_role, get_current_user
 
+# Pre-configured role dependencies for route protection.
+# require_admin: raises HTTP 403 if user.role != "admin"
+require_admin = require_role("admin")
 
-# ── Pre-configured authorization dependencies ────────────────────────────
-# Import these directly into route files for clean, discoverable RBAC.
-
-def require_admin(current_user: dict = Depends(require_role("admin"))):
-    """Require admin role — raises HTTP 403 if user.role != 'admin'.
-
-    Use as a FastAPI dependency on routes that expose cross-user data
-    or perform destructive administrative operations.
-    """
-    return current_user
-
-
-async def require_authenticated_user(current_user: dict = Depends(get_current_user)):
-    """Require any authenticated user — raises HTTP 401 if no valid session.
-
-    This is the default authorization level for most API routes.
-    Data isolation (users only see own data) is enforced at the query level.
-    """
-    return current_user
+# require_authenticated_user: raises HTTP 401 if no valid session
+require_authenticated_user = get_current_user

@@ -20,6 +20,7 @@ inputs are passed through Pydantic validation and bleach sanitization before
 reaching the database layer, preventing NoSQL injection as well.
 """
 from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -31,7 +32,7 @@ import uuid
 from app.core.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
 from app.core.csrf import CSRFProtectionMiddleware
-from app.core.cors import configure_cors
+from app.core.cors import CORS_CONFIG
 from app.core.rate_limiter import rate_limit
 from app.db.mongodb import MongoDB, get_user_memory_collection
 from app.services.agent_orchestrator import AgentOrchestrator
@@ -100,7 +101,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CSRFProtectionMiddleware)
 
 # CORS (runs second — see core/cors.py for allowed origins, methods, headers)
-configure_cors(app)
+app.add_middleware(CORSMiddleware, **CORS_CONFIG)
 
 
 
