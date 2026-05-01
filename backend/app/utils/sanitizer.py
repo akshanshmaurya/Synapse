@@ -17,7 +17,6 @@ Call sites:
 OWASP Top 10 compliance: A03:2021 (Injection)
 """
 import bleach
-import re
 
 
 def sanitize_text(text: str) -> str:
