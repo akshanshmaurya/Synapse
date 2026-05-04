@@ -27,7 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
-.env.production
+# .env.production is INTENTIONALLY tracked — it contains only the public
+# backend URL (no secrets). Vite loads it automatically during prod builds.
 .env.development
 backend/.env
 
