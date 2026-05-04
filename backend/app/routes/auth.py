@@ -26,13 +26,16 @@ def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: 
     production = settings.ENVIRONMENT == "production"
     # Ensure domain is formally passed or None
     cookie_domain = settings.COOKIE_DOMAIN if settings.COOKIE_DOMAIN else None
+    samesite = settings.COOKIE_SAMESITE.lower()  # "lax" or "none"
+    # samesite=none REQUIRES secure=True (browser spec)
+    secure = True if samesite == "none" else production
 
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="lax",
-        secure=production,
+        samesite=samesite,
+        secure=secure,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
         domain=cookie_domain,
@@ -43,8 +46,8 @@ def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: 
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            samesite="lax",
-            secure=production,
+            samesite=samesite,
+            secure=secure,
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
             path="/api/auth/refresh",  # Only sent to refresh and logout
             domain=cookie_domain,
@@ -294,23 +297,24 @@ async def logout(request: Request):
                     break
             logger.info("TOKEN_REVOKED: User logged out, session cleared for user: %s", user_id)
 
-    production = settings.ENVIRONMENT == "production"
+    samesite = settings.COOKIE_SAMESITE.lower()
+    secure = True if samesite == "none" else settings.ENVIRONMENT == "production"
     response = JSONResponse(content={"message": "Logged out"})
     
     response.delete_cookie(
         key="access_token",
         path="/",
         httponly=True,
-        samesite="lax",
-        secure=production,
+        samesite=samesite,
+        secure=secure,
     )
     
     response.delete_cookie(
         key="refresh_token",
         path="/api/auth/refresh",
         httponly=True,
-        samesite="lax",
-        secure=production,
+        samesite=samesite,
+        secure=secure,
     )
     return response
 
@@ -345,21 +349,22 @@ async def change_password(
     await sessions.delete_many({"user_id": user_id})
     logger.info("TOKEN_REVOKED: Password changed, all sessions revoked for user: %s", user_id)
     
-    production = settings.ENVIRONMENT == "production"
+    samesite = settings.COOKIE_SAMESITE.lower()
+    secure = True if samesite == "none" else settings.ENVIRONMENT == "production"
     response = JSONResponse(content={"message": "Password updated successfully. Please log in again."})
     
     response.delete_cookie(
         key="access_token",
         path="/",
         httponly=True,
-        samesite="lax",
-        secure=production,
+        samesite=samesite,
+        secure=secure,
     )
     response.delete_cookie(
         key="refresh_token",
         path="/api/auth/refresh",
         httponly=True,
-        samesite="lax",
-        secure=production,
+        samesite=samesite,
+        secure=secure,
     )
     return response

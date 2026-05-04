@@ -69,7 +69,14 @@ class Settings(BaseSettings):
     # --- Cookies ---
     # Set to your apex domain, e.g.:
     #   COOKIE_DOMAIN=yoursite.com
-    COOKIE_DOMAIN: str = "localhost"
+    # Leave empty string for no explicit domain (Render default).
+    COOKIE_DOMAIN: str = ""
+
+    # SameSite policy for auth cookies.
+    # "lax"  → same-domain or subdomain deployments (default)
+    # "none" → cross-domain deployments (e.g., onrender.com → akshnsh.me)
+    # When "none", Secure=True is forced automatically.
+    COOKIE_SAMESITE: str = "lax"
 
     model_config = {
         "env_file": os.path.join(os.path.dirname(__file__), "..", "..", ".env"),

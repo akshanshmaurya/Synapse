@@ -26,3 +26,6 @@ pydantic-settings==2.13.1
 
 # Security
 bleach==6.3.0
+
+# Production Server
+gunicorn==23.0.0

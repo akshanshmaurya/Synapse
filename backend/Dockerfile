@@ -24,13 +24,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application source
 COPY app/ ./app/
 
-# Expose FastAPI port
-EXPOSE 8000
+# Render injects PORT dynamically; default to 8000 for local Docker builds
+ENV PORT=8000
+EXPOSE ${PORT}
 
-# Health check
+# Health check (uses PORT env var)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen(f'http://localhost:{__import__(\"os\").environ.get(\"PORT\",8000)}/health')" || exit 1
 
-# Run with Uvicorn
-# Environment variables (MONGO_URI, JWT_SECRET, etc.) must be injected at runtime
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run with Gunicorn + Uvicorn workers for production stability
+# - Workers: 2 (fits Render free-tier 512MB RAM)
+# - Timeout: 120s (AI responses can be slow)
+# - Shell form so $PORT is expanded at runtime
+CMD gunicorn -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app.main:app
