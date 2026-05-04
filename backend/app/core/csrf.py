@@ -14,8 +14,12 @@ from fastapi.responses import JSONResponse
 
 class CSRFProtectionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Only enforce on state-changing methods
         """Internal helper."""
+        # Always let OPTIONS through — required for CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # Only enforce on state-changing methods
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             # Check for allowed Content-Types
             # Note: We must allow multipart/form-data if we have file uploads, but presently we don't.
@@ -34,3 +38,4 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
                 )
                     
         return await call_next(request)
+
